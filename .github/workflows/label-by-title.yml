@@ -21,6 +21,9 @@ jobs:
               feat: "enhancement",
               fix: "bug",
               docs: "documentation",
+              chore: "chore",
+              refactor: "refactor",
+              test: "test",
             };
 
             const item = context.payload.issue ?? context.payload.pull_request;
