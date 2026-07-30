@@ -177,6 +177,8 @@ export default function ReviewPage() {
       <PracticeSession
         questions={phase.questions}
         theoryMap={phase.theoryMap}
+        mode="study"
+        timeLimitMs={null}
         onFinish={(summary) => setPhase({ kind: "done", summary })}
       />
     );

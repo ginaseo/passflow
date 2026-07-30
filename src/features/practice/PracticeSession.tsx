@@ -1,27 +1,40 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { QuestionCard } from "./QuestionCard";
 import { gradeAnswer } from "@/lib/grading";
 import { resolveTheoryLink } from "@/lib/theory";
 import { summarizeSession, type SessionSummary } from "@/lib/summary";
+import { formatDuration, remainingMs } from "@/lib/timer";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
+import type { Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 interface PracticeSessionProps {
   questions: Question[];
   theoryMap: TheoryMap;
+  mode: Mode;
+  timeLimitMs: number | null;
   onFinish: (summary: SessionSummary) => void;
 }
 
 const progressRepository = new IndexedDbProgressRepository();
 
-export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSessionProps) {
+export function PracticeSession({
+  questions,
+  theoryMap,
+  mode,
+  timeLimitMs,
+  onFinish,
+}: PracticeSessionProps) {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [favorited, setFavorited] = useState<Record<number, boolean>>({});
   const [questionStartedAt, setQuestionStartedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  const [sessionStartedAt] = useState(() => Date.now());
+  const finishedRef = useRef(false);
 
   const question = questions[current];
   const selectedAnswer = answers[current] ?? null;
@@ -29,6 +42,9 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
     () => resolveTheoryLink(question, theoryMap),
     [question, theoryMap]
   );
+  const showFeedback = mode === "study" && selectedAnswer !== null;
+  const remaining =
+    timeLimitMs !== null ? remainingMs(sessionStartedAt, now, timeLimitMs) : null;
 
   function goTo(nextIndex: number) {
     if (nextIndex < 0 || nextIndex >= questions.length) return;
@@ -37,35 +53,94 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
   }
 
   function select(answer: number) {
-    if (selectedAnswer !== null) return;
-    setAnswers((prev) => ({ ...prev, [current]: answer }));
+    if (mode === "study") {
+      if (selectedAnswer !== null) return;
+      setAnswers((prev) => ({ ...prev, [current]: answer }));
 
-    const isCorrect = gradeAnswer(question, answer);
-    progressRepository
-      .recordAttempt({
-        questionId: question.questionId,
-        solvedAt: Date.now(),
-        mode: "study",
-        selectedAnswer: answer,
-        isCorrect,
-        solveTimeMs: Date.now() - questionStartedAt,
-      })
-      .catch((err) => console.error("recordAttempt failed:", err));
-
-    if (!isCorrect) {
+      const isCorrect = gradeAnswer(question, answer);
       progressRepository
-        .addWrongNote(question.questionId)
-        .catch((err) => console.error("addWrongNote failed:", err));
+        .recordAttempt({
+          questionId: question.questionId,
+          solvedAt: Date.now(),
+          mode,
+          selectedAnswer: answer,
+          isCorrect,
+          solveTimeMs: Date.now() - questionStartedAt,
+        })
+        .catch((err) => console.error("recordAttempt failed:", err));
+
+      if (!isCorrect) {
+        progressRepository
+          .addWrongNote(question.questionId)
+          .catch((err) => console.error("addWrongNote failed:", err));
+      }
+    } else {
+      // 시험모드는 답을 자유롭게 바꿀 수 있고, 실제 채점·기록은 제출 시점(submitExam)에 한 번에 한다.
+      setAnswers((prev) => ({ ...prev, [current]: answer }));
     }
   }
 
   function toggleFavorite() {
-    if (favorited[current]) return;
-    setFavorited((prev) => ({ ...prev, [current]: true }));
-    progressRepository
-      .addFavorite(question.questionId)
-      .catch((err) => console.error("addFavorite failed:", err));
+    const next = !favorited[current];
+    setFavorited((prev) => ({ ...prev, [current]: next }));
+    const action = next
+      ? progressRepository.addFavorite(question.questionId)
+      : progressRepository.removeFavorite(question.questionId);
+    action.catch((err) => console.error("toggleFavorite failed:", err));
   }
+
+  function submitExam() {
+    const answeredCount = Object.keys(answers).length;
+    // ponytail: 시험모드는 문항 재선택이 자유로워 문항별 정확한 풀이시간을 못 잰다.
+    // 전체 소요시간을 답한 문항 수로 균등 분배한다 — 문항별 세부 통계는 Phase 2.
+    const avgSolveTimeMs =
+      answeredCount === 0
+        ? 0
+        : Math.round((Date.now() - sessionStartedAt) / answeredCount);
+
+    for (const [indexStr, answer] of Object.entries(answers)) {
+      const q = questions[Number(indexStr)];
+      const isCorrect = gradeAnswer(q, answer);
+      progressRepository
+        .recordAttempt({
+          questionId: q.questionId,
+          solvedAt: Date.now(),
+          mode: "exam",
+          selectedAnswer: answer,
+          isCorrect,
+          solveTimeMs: avgSolveTimeMs,
+        })
+        .catch((err) => console.error("recordAttempt failed:", err));
+
+      if (!isCorrect) {
+        progressRepository
+          .addWrongNote(q.questionId)
+          .catch((err) => console.error("addWrongNote failed:", err));
+      }
+    }
+
+    onFinish(summarizeSession(questions, answers));
+  }
+
+  function finish() {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    if (mode === "exam") {
+      submitExam();
+    } else {
+      onFinish(summarizeSession(questions, answers));
+    }
+  }
+
+  useEffect(() => {
+    if (mode !== "exam" || timeLimitMs === null) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [mode, timeLimitMs]);
+
+  useEffect(() => {
+    if (remaining === 0) finish();
+  }, [remaining, finish]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -75,7 +150,7 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
       } else if (e.key === " ") {
         e.preventDefault();
         if (current === questions.length - 1) {
-          onFinish(summarizeSession(questions, answers));
+          finish();
         } else {
           goTo(current + 1);
         }
@@ -93,12 +168,15 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="max-w-xl mx-auto w-full flex justify-end px-6">
-        <button
-          type="button"
-          onClick={() => onFinish(summarizeSession(questions, answers))}
-          className="text-sm text-gray-500 underline"
-        >
+      <div className="max-w-xl mx-auto w-full flex items-center justify-between px-6">
+        {remaining !== null ? (
+          <span className={remaining <= 60_000 ? "text-red-600 font-medium" : "text-gray-500"}>
+            남은시간 {formatDuration(remaining)}
+          </span>
+        ) : (
+          <span />
+        )}
+        <button type="button" onClick={finish} className="text-sm text-gray-500 underline">
           그만두기
         </button>
       </div>
@@ -107,7 +185,8 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
         index={current}
         total={questions.length}
         selectedAnswer={selectedAnswer}
-        theoryLink={selectedAnswer !== null ? theoryLink : null}
+        showFeedback={showFeedback}
+        theoryLink={showFeedback ? theoryLink : null}
         isFavorited={favorited[current] ?? false}
         onSelect={select}
         onFavorite={toggleFavorite}
@@ -123,11 +202,7 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
         </button>
         <span>Space: 다음 · 1~4: 답 선택 · F: 즐겨찾기</span>
         {current === questions.length - 1 ? (
-          <button
-            type="button"
-            onClick={() => onFinish(summarizeSession(questions, answers))}
-            className="text-blue-700 font-medium"
-          >
+          <button type="button" onClick={finish} className="text-blue-700 font-medium">
             종료
           </button>
         ) : (
