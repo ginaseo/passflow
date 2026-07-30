@@ -1,6 +1,6 @@
-// 문제 데이터를 가져온다. 원본 JSON을 public/data/로 복사한다.
+// 문제 데이터를 가져온다. 원본 JSON과 이미지를 public/data/로 복사한다.
 // 원본 위치는 .env.local의 PASSFLOW_DATA_DIR로 지정한다.
-import { readdirSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
+import { readdirSync, mkdirSync, copyFileSync, cpSync, rmSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 
 const SRC = process.env.PASSFLOW_DATA_DIR;
@@ -32,4 +32,11 @@ for (const name of targets) {
   copyFileSync(join(SRC, name), join(DEST, name));
 }
 
-console.log(`${targets.length}개 JSON을 ${DEST}로 복사했다.`);
+const imagesSrc = join(SRC, "images");
+let imageCount = 0;
+if (existsSync(imagesSrc)) {
+  cpSync(imagesSrc, join(DEST, "images"), { recursive: true });
+  imageCount = readdirSync(imagesSrc).length;
+}
+
+console.log(`${targets.length}개 JSON, 이미지 ${imageCount}개를 ${DEST}로 복사했다.`);
