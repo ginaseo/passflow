@@ -83,6 +83,8 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
         goTo(current + 1);
       } else if (e.key === "ArrowLeft") {
         goTo(current - 1);
+      } else if (e.key === "f" || e.key === "F") {
+        toggleFavorite();
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -119,7 +121,7 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
         >
           ← 이전
         </button>
-        <span>Space: 다음 · 1~4: 답 선택</span>
+        <span>Space: 다음 · 1~4: 답 선택 · F: 즐겨찾기</span>
         {current === questions.length - 1 ? (
           <button
             type="button"
