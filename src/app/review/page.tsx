@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ReviewList } from "@/features/review/ReviewList";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getRecentlySolvedQuestionIds } from "@/lib/recentlySolved";
@@ -47,8 +47,10 @@ export default function ReviewPage() {
   const [phase, setPhase] = useState<Phase>({ kind: "list" });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const latestRequestId = useRef(0);
 
   async function loadTab(nextTab: Tab) {
+    const requestId = ++latestRequestId.current;
     setLoading(true);
     try {
       let questionIds: string[];
@@ -60,11 +62,14 @@ export default function ReviewPage() {
         const attempts = await progressRepository.getAttempts();
         questionIds = getRecentlySolvedQuestionIds(attempts, 20);
       }
-      setQuestions(await hydrate(questionIds));
+      const hydrated = await hydrate(questionIds);
+      if (requestId !== latestRequestId.current) return;
+      setQuestions(hydrated);
     } catch {
+      if (requestId !== latestRequestId.current) return;
       setQuestions([]);
     } finally {
-      setLoading(false);
+      if (requestId === latestRequestId.current) setLoading(false);
     }
   }
 
