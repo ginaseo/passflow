@@ -48,3 +48,6 @@ next-env.d.ts
 
 # superpowers subagent-driven-development 작업 스크래치
 /.superpowers/
+
+# 계획 문서 — 로컬 작업용, repo엔 안 넣는다
+/docs/superpowers/
