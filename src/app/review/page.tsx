@@ -104,11 +104,19 @@ export default function ReviewPage() {
   }, [tab]);
 
   async function handleRemove(questionId: string) {
-    if (tab === "wrong") {
+    const removingFromTab = tab;
+    const requestId = ++latestRequestId.current;
+
+    if (removingFromTab === "wrong") {
       await progressRepository.removeWrongNote(questionId).catch((err) => console.error(err));
-    } else if (tab === "favorite") {
+    } else if (removingFromTab === "favorite") {
       await progressRepository.removeFavorite(questionId).catch((err) => console.error(err));
     }
+
+    // 삭제가 끝나기 전에 사용자가 다른 탭으로 전환했으면, 지금 화면엔 그 탭의 문항이
+    // 떠 있으므로 여기서 필터링하면 안 된다 — DB는 이미 정확히 지워졌고, 화면 반영은
+    // 다음 탭 로드(loadTab)가 최신 상태로 알아서 채운다.
+    if (tab !== removingFromTab || requestId !== latestRequestId.current) return;
     setQuestions((prev) => prev.filter((q) => q.questionId !== questionId));
   }
 
