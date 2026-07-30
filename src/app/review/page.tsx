@@ -42,40 +42,65 @@ async function hydrate(questionIds: string[]): Promise<Question[]> {
     .map((r) => r.value);
 }
 
+async function fetchTabQuestions(nextTab: Tab): Promise<Question[]> {
+  let questionIds: string[];
+  if (nextTab === "wrong") {
+    questionIds = (await progressRepository.getWrongNotes()).map((n) => n.questionId);
+  } else if (nextTab === "favorite") {
+    questionIds = (await progressRepository.getFavorites()).map((n) => n.questionId);
+  } else {
+    const attempts = await progressRepository.getAttempts();
+    questionIds = getRecentlySolvedQuestionIds(attempts, 20);
+  }
+  return hydrate(questionIds);
+}
+
 export default function ReviewPage() {
   const [tab, setTab] = useState<Tab>("wrong");
   const [phase, setPhase] = useState<Phase>({ kind: "list" });
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [loading, setLoading] = useState(true);
+  // `loadedTab` (rather than a `loading` boolean flipped via effect) lets `loading` be
+  // derived during render instead of set synchronously inside useEffect, which
+  // react-hooks/set-state-in-effect disallows even through an intermediate async call.
+  const [loadedTab, setLoadedTab] = useState<Tab | null>(null);
   const latestRequestId = useRef(0);
+  const loading = loadedTab !== tab;
 
-  async function loadTab(nextTab: Tab) {
+  // Reusable for imperative reloads (e.g. the "복습 목록으로" button) — never referenced
+  // from the effect below, since react-hooks/set-state-in-effect flags any effect that
+  // captures a function which itself calls a state setter, however deep.
+  function loadTab(nextTab: Tab) {
     const requestId = ++latestRequestId.current;
-    setLoading(true);
-    try {
-      let questionIds: string[];
-      if (nextTab === "wrong") {
-        questionIds = (await progressRepository.getWrongNotes()).map((n) => n.questionId);
-      } else if (nextTab === "favorite") {
-        questionIds = (await progressRepository.getFavorites()).map((n) => n.questionId);
-      } else {
-        const attempts = await progressRepository.getAttempts();
-        questionIds = getRecentlySolvedQuestionIds(attempts, 20);
+    fetchTabQuestions(nextTab).then(
+      (hydrated) => {
+        if (requestId !== latestRequestId.current) return;
+        setQuestions(hydrated);
+        setLoadedTab(nextTab);
+      },
+      (err) => {
+        if (requestId !== latestRequestId.current) return;
+        console.error("loadTab failed:", err);
+        setQuestions([]);
+        setLoadedTab(nextTab);
       }
-      const hydrated = await hydrate(questionIds);
-      if (requestId !== latestRequestId.current) return;
-      setQuestions(hydrated);
-    } catch {
-      if (requestId !== latestRequestId.current) return;
-      setQuestions([]);
-    } finally {
-      if (requestId === latestRequestId.current) setLoading(false);
-    }
+    );
   }
 
   useEffect(() => {
-    void loadTab(tab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const requestId = ++latestRequestId.current;
+    fetchTabQuestions(tab).then(
+      (hydrated) => {
+        if (requestId !== latestRequestId.current) return;
+        setQuestions(hydrated);
+        setLoadedTab(tab);
+      },
+      (err) => {
+        if (requestId !== latestRequestId.current) return;
+        console.error("loadTab failed:", err);
+        setQuestions([]);
+        setLoadedTab(tab);
+      }
+    );
   }, [tab]);
 
   async function handleRemove(questionId: string) {
@@ -123,7 +148,7 @@ export default function ReviewPage() {
           type="button"
           onClick={() => {
             setPhase({ kind: "list" });
-            void loadTab(tab);
+            loadTab(tab);
           }}
           className="px-4 py-2 rounded bg-blue-600 text-white"
         >
