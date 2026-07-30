@@ -59,7 +59,12 @@ export function ReviewList({ questions, emptyMessage, onRemove, onRetry }: Revie
               onChange={() => toggleSelected(question.questionId)}
               aria-label={`${question.stem} 선택`}
             />
-            <span className="text-sm truncate flex-1">{question.stem}</span>
+            <span
+              onClick={() => toggleSelected(question.questionId)}
+              className="text-sm truncate flex-1 cursor-pointer"
+            >
+              {question.stem}
+            </span>
             {onRemove && (
               <button
                 type="button"

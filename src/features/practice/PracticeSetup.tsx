@@ -22,7 +22,7 @@ export function PracticeSetup({ onStart }: PracticeSetupProps) {
 
       <div className="flex flex-col gap-2">
         <span className="font-medium">과목</span>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2">
           <button
             type="button"
             onClick={() => setSubject("all")}
