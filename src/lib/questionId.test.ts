@@ -15,4 +15,8 @@ describe("parseQuestionId", () => {
   it("하이픈이 포함된 examId도 분리한다 (2020년 1·2회 통합)", () => {
     expect(parseQuestionId("2020-1-2-Q45")).toEqual({ examId: "2020-1-2", qnum: 45 });
   });
+
+  it("-Q 마커가 없으면 명확한 에러를 던진다", () => {
+    expect(() => parseQuestionId("malformed-id")).toThrow(/잘못된 questionId 형식이다/);
+  });
 });
