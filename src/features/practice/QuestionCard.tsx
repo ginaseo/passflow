@@ -9,6 +9,7 @@ interface QuestionCardProps {
   index: number;
   total: number;
   selectedAnswer: number | null;
+  showFeedback: boolean;
   theoryLink: TheoryLink | null;
   isFavorited: boolean;
   onSelect: (answer: number) => void;
@@ -20,13 +21,14 @@ export function QuestionCard({
   index,
   total,
   selectedAnswer,
+  showFeedback,
   theoryLink,
   isFavorited,
   onSelect,
   onFavorite,
 }: QuestionCardProps) {
-  const isGraded = selectedAnswer !== null;
-  const isCorrect = isGraded && isCorrectOption(question, selectedAnswer);
+  const isCorrect =
+    showFeedback && selectedAnswer !== null && isCorrectOption(question, selectedAnswer);
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
@@ -34,12 +36,7 @@ export function QuestionCard({
         <span>
           {index + 1} / {total}
         </span>
-        <button
-          type="button"
-          onClick={onFavorite}
-          disabled={isFavorited}
-          className="text-yellow-600 disabled:text-yellow-600"
-        >
+        <button type="button" onClick={onFavorite} className="text-yellow-600">
           {isFavorited ? "★ 즐겨찾기 완료" : "☆ 즐겨찾기"}
         </button>
       </div>
@@ -57,15 +54,15 @@ export function QuestionCard({
           const isAnswer = isCorrectOption(question, optionNumber);
 
           let style = "border-gray-300";
-          if (isGraded && isAnswer) style = "border-green-600 bg-green-50";
-          else if (isGraded && isSelected && !isAnswer) style = "border-red-600 bg-red-50";
+          if (showFeedback && isAnswer) style = "border-green-600 bg-green-50";
+          else if (showFeedback && isSelected && !isAnswer) style = "border-red-600 bg-red-50";
           else if (isSelected) style = "border-blue-600";
 
           return (
             <button
               key={optionNumber}
               type="button"
-              disabled={isGraded}
+              disabled={showFeedback}
               onClick={() => onSelect(optionNumber)}
               className={`text-left px-3 py-2 rounded border ${style}`}
             >
@@ -75,7 +72,7 @@ export function QuestionCard({
         })}
       </div>
 
-      {isGraded && (
+      {showFeedback && (
         <div className="flex flex-col gap-2 mt-2 p-3 rounded bg-gray-50">
           <p className={isCorrect ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
             {isCorrect ? "정답" : "오답"}

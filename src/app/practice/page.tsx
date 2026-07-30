@@ -6,6 +6,7 @@ import { PracticeSession } from "@/features/practice/PracticeSession";
 import { pickRandomQuestions } from "@/lib/sampling";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import type { Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
@@ -14,7 +15,7 @@ const questionRepository = new JsonQuestionRepository();
 type Phase =
   | { kind: "setup" }
   | { kind: "loading" }
-  | { kind: "active"; questions: Question[]; theoryMap: TheoryMap }
+  | { kind: "active"; questions: Question[]; theoryMap: TheoryMap; mode: Mode; timeLimitMs: number | null }
   | { kind: "done"; summary: SessionSummary }
   | { kind: "error"; message: string };
 
@@ -25,20 +26,34 @@ export default function PracticePage() {
     setPhase({ kind: "loading" });
 
     try {
-      const [pool, theoryMap] = await Promise.all([
-        questionRepository.getQuestions(
-          value.subject === "all" ? {} : { subject: value.subject }
-        ),
-        questionRepository.getTheoryMap(),
-      ]);
+      const theoryMapPromise = questionRepository.getTheoryMap();
+      theoryMapPromise.catch(() => {}); // 실제 에러 처리는 아래 await 시점에서 수행됨 — unhandled rejection 방지용
+      let questions: Question[];
 
-      const questions = pickRandomQuestions(pool, value.count);
+      if (value.entryType === "round") {
+        const pool = await questionRepository.getQuestions({ examId: value.examId });
+        questions = [...pool].sort((a, b) => a.qnum - b.qnum);
+      } else {
+        const pool = await questionRepository.getQuestions(
+          value.subject === "all" ? {} : { subject: value.subject }
+        );
+        questions = pickRandomQuestions(pool, value.count);
+      }
+
+      const theoryMap = await theoryMapPromise;
+
       if (questions.length === 0) {
         setPhase({ kind: "error", message: "문제를 찾을 수 없다. 다시 시도해달라." });
         return;
       }
 
-      setPhase({ kind: "active", questions, theoryMap });
+      setPhase({
+        kind: "active",
+        questions,
+        theoryMap,
+        mode: value.mode,
+        timeLimitMs: value.timeLimitMs,
+      });
     } catch {
       setPhase({ kind: "error", message: "문제를 불러오지 못했다. 다시 시도해달라." });
     }
@@ -90,6 +105,8 @@ export default function PracticePage() {
     <PracticeSession
       questions={phase.questions}
       theoryMap={phase.theoryMap}
+      mode={phase.mode}
+      timeLimitMs={phase.timeLimitMs}
       onFinish={(summary) => setPhase({ kind: "done", summary })}
     />
   );

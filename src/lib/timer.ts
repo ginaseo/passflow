@@ -17,3 +17,14 @@ export function isSameLocalDay(timestamp: number, now: number): boolean {
     a.getDate() === b.getDate()
   );
 }
+
+export function remainingMs(startedAt: number, now: number, limitMs: number): number {
+  return Math.max(0, startedAt + limitMs - now);
+}
+
+export function formatDuration(ms: number): string {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}

@@ -5,6 +5,7 @@ import type { TheoryMap } from "@/types/theory";
 export interface QuestionRepository {
   getQuestion(questionId: string): Promise<Question>;
   getQuestions(filter: { examId?: string; subject?: number }): Promise<Question[]>;
+  getExamIndex(): Promise<ExamSummary[]>;
   getTheoryMap(): Promise<TheoryMap>;
 }
 
@@ -83,6 +84,10 @@ export class JsonQuestionRepository implements QuestionRepository {
         });
     }
     return this.theoryMapCache;
+  }
+
+  async getExamIndex(): Promise<ExamSummary[]> {
+    return this.loadIndex();
   }
 
   async getQuestion(questionId: string): Promise<Question> {
