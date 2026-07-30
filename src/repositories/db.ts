@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { Attempt, QuestionStats } from "@/types/progress";
+import type { Attempt, Favorite, QuestionStats, WrongNote } from "@/types/progress";
+import type { Settings } from "@/types/settings";
 
 interface PassFlowDB extends DBSchema {
   attempts: {
@@ -13,11 +14,15 @@ interface PassFlowDB extends DBSchema {
   };
   wrongNotes: {
     key: string;
-    value: { questionId: string; addedAt: number };
+    value: WrongNote;
   };
   favorites: {
     key: string;
-    value: { questionId: string; addedAt: number };
+    value: Favorite;
+  };
+  settings: {
+    key: string;
+    value: Settings;
   };
 }
 
@@ -25,16 +30,21 @@ let dbPromise: Promise<IDBPDatabase<PassFlowDB>> | null = null;
 
 export function getDb(): Promise<IDBPDatabase<PassFlowDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<PassFlowDB>("passflow", 1, {
-      upgrade(db) {
-        const attempts = db.createObjectStore("attempts", {
-          keyPath: "id",
-          autoIncrement: true,
-        });
-        attempts.createIndex("questionId", "questionId");
-        db.createObjectStore("questionStats", { keyPath: "questionId" });
-        db.createObjectStore("wrongNotes", { keyPath: "questionId" });
-        db.createObjectStore("favorites", { keyPath: "questionId" });
+    dbPromise = openDB<PassFlowDB>("passflow", 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          const attempts = db.createObjectStore("attempts", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+          attempts.createIndex("questionId", "questionId");
+          db.createObjectStore("questionStats", { keyPath: "questionId" });
+          db.createObjectStore("wrongNotes", { keyPath: "questionId" });
+          db.createObjectStore("favorites", { keyPath: "questionId" });
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore("settings");
+        }
       },
     });
   }
