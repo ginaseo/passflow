@@ -45,3 +45,6 @@ next-env.d.ts
 
 # 문제 데이터
 /public/data/
+
+# superpowers subagent-driven-development 작업 스크래치
+/.superpowers/
