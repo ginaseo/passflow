@@ -1,35 +1,65 @@
 "use client";
 
+import { useState } from "react";
 import type { Question } from "@/types/question";
 
 interface ReviewListProps {
   questions: Question[];
   emptyMessage: string;
   onRemove?: (questionId: string) => void;
-  onRetryAll: () => void;
+  onRetry: (questions: Question[]) => void;
 }
 
-export function ReviewList({ questions, emptyMessage, onRemove, onRetryAll }: ReviewListProps) {
+export function ReviewList({ questions, emptyMessage, onRemove, onRetry }: ReviewListProps) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
   if (questions.length === 0) {
     return <p className="text-center text-gray-500 p-10">{emptyMessage}</p>;
   }
 
+  function toggleSelected(questionId: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(questionId)) {
+        next.delete(questionId);
+      } else {
+        next.add(questionId);
+      }
+      return next;
+    });
+  }
+
+  const selectedQuestions = questions.filter((q) => selected.has(q.questionId));
+
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
-      <button
-        type="button"
-        onClick={onRetryAll}
-        className="self-start px-4 py-2 rounded bg-blue-600 text-white font-medium"
-      >
-        전체 다시 풀기 ({questions.length}문제)
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => onRetry(questions)}
+          className="px-4 py-2 rounded bg-blue-600 text-white font-medium"
+        >
+          전체 다시 풀기 ({questions.length}문제)
+        </button>
+        <button
+          type="button"
+          onClick={() => onRetry(selectedQuestions)}
+          disabled={selectedQuestions.length === 0}
+          className="px-4 py-2 rounded border font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          선택 다시 풀기 ({selectedQuestions.length}문제)
+        </button>
+      </div>
       <ul className="flex flex-col gap-2">
         {questions.map((question) => (
-          <li
-            key={question.questionId}
-            className="flex items-center justify-between gap-3 p-3 rounded border"
-          >
-            <span className="text-sm truncate">{question.stem}</span>
+          <li key={question.questionId} className="flex items-center gap-3 p-3 rounded border">
+            <input
+              type="checkbox"
+              checked={selected.has(question.questionId)}
+              onChange={() => toggleSelected(question.questionId)}
+              aria-label={`${question.stem} 선택`}
+            />
+            <span className="text-sm truncate flex-1">{question.stem}</span>
             {onRemove && (
               <button
                 type="button"
