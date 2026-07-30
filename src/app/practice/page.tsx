@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/PracticeSetup";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { pickRandomQuestions } from "@/lib/sampling";
+import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
@@ -14,7 +15,7 @@ type Phase =
   | { kind: "setup" }
   | { kind: "loading" }
   | { kind: "active"; questions: Question[]; theoryMap: TheoryMap }
-  | { kind: "done" }
+  | { kind: "done"; summary: SessionSummary }
   | { kind: "error"; message: string };
 
 export default function PracticePage() {
@@ -67,9 +68,13 @@ export default function PracticePage() {
   }
 
   if (phase.kind === "done") {
+    const { total, solved, correct, wrong } = phase.summary;
     return (
       <div className="text-center p-10 flex flex-col gap-4 items-center">
         <p className="text-lg font-medium">수고했다.</p>
+        <p className="text-gray-600">
+          {total}문제 중 {solved}문제 풀이 — 정답 {correct} · 오답 {wrong}
+        </p>
         <button
           type="button"
           onClick={() => setPhase({ kind: "setup" })}
@@ -85,7 +90,7 @@ export default function PracticePage() {
     <PracticeSession
       questions={phase.questions}
       theoryMap={phase.theoryMap}
-      onFinish={() => setPhase({ kind: "done" })}
+      onFinish={(summary) => setPhase({ kind: "done", summary })}
     />
   );
 }
