@@ -51,12 +51,18 @@ const exam2023_2 = {
   ],
 };
 
+const theoryMapFixture = {
+  "075": { tag: null, name: "스택(Stack)", page: 25, subject: "2과목 소프트웨어 개발" },
+};
+
 function mockFetchJson(url: string) {
   const body = url.includes("exams_index")
     ? examsIndexFixture
-    : url.includes("exam_2023-1")
-      ? exam2023_1
-      : exam2023_2;
+    : url.includes("theory_map")
+      ? theoryMapFixture
+      : url.includes("exam_2023-1")
+        ? exam2023_1
+        : exam2023_2;
   return Promise.resolve({
     ok: true,
     json: () => Promise.resolve(body),
@@ -133,5 +139,35 @@ describe("JsonQuestionRepository", () => {
     const qs = await repo.getQuestions({ subject: 1 });
     expect(qs.map((q) => q.questionId).sort()).toEqual(["2023-1-Q1", "2023-2-Q1"]);
     expect(mockFetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("getTheoryMap은 /data/theory_map.json을 fetch해서 반환한다", async () => {
+    const repo = new JsonQuestionRepository();
+    const map = await repo.getTheoryMap();
+    expect(map["075"].name).toBe("스택(Stack)");
+    expect(fetch).toHaveBeenCalledWith("/data/theory_map.json");
+  });
+
+  it("getTheoryMap을 두 번 불러도 fetch는 한 번만 일어난다 (캐시)", async () => {
+    const repo = new JsonQuestionRepository();
+    await repo.getTheoryMap();
+    await repo.getTheoryMap();
+    const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
+      String(url).includes("theory_map")
+    );
+    expect(calls).toHaveLength(1);
+  });
+
+  it("getTheoryMap의 fetch가 실패해도 캐시에 남지 않아 재시도 시 다시 fetch한다", async () => {
+    const repo = new JsonQuestionRepository();
+    const mockFetch = vi.fn(mockFetchJson);
+    mockFetch.mockRejectedValueOnce(new Error("network error"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(repo.getTheoryMap()).rejects.toThrow("network error");
+
+    const map = await repo.getTheoryMap();
+    expect(map["075"].name).toBe("스택(Stack)");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { isSameLocalDay } from "@/lib/timer";
-import type { Attempt, DashboardSummary, QuestionStats } from "@/types/progress";
+import type { Attempt, DashboardSummary, Favorite, QuestionStats, WrongNote } from "@/types/progress";
 
 export interface ProgressRepository {
   recordAttempt(attempt: Omit<Attempt, "id">): Promise<void>;
@@ -9,6 +9,10 @@ export interface ProgressRepository {
   getDashboardSummary(): Promise<DashboardSummary>;
   addWrongNote(questionId: string): Promise<void>;
   addFavorite(questionId: string): Promise<void>;
+  getWrongNotes(): Promise<WrongNote[]>;
+  getFavorites(): Promise<Favorite[]>;
+  removeWrongNote(questionId: string): Promise<void>;
+  removeFavorite(questionId: string): Promise<void>;
 }
 
 export class IndexedDbProgressRepository implements ProgressRepository {
@@ -82,5 +86,25 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   async addFavorite(questionId: string): Promise<void> {
     const db = await getDb();
     await db.put("favorites", { questionId, addedAt: Date.now() });
+  }
+
+  async getWrongNotes(): Promise<WrongNote[]> {
+    const db = await getDb();
+    return db.getAll("wrongNotes");
+  }
+
+  async getFavorites(): Promise<Favorite[]> {
+    const db = await getDb();
+    return db.getAll("favorites");
+  }
+
+  async removeWrongNote(questionId: string): Promise<void> {
+    const db = await getDb();
+    await db.delete("wrongNotes", questionId);
+  }
+
+  async removeFavorite(questionId: string): Promise<void> {
+    const db = await getDb();
+    await db.delete("favorites", questionId);
   }
 }

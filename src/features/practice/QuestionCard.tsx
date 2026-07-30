@@ -10,7 +10,9 @@ interface QuestionCardProps {
   total: number;
   selectedAnswer: number | null;
   theoryLink: TheoryLink | null;
+  isFavorited: boolean;
   onSelect: (answer: number) => void;
+  onFavorite: () => void;
 }
 
 export function QuestionCard({
@@ -19,15 +21,27 @@ export function QuestionCard({
   total,
   selectedAnswer,
   theoryLink,
+  isFavorited,
   onSelect,
+  onFavorite,
 }: QuestionCardProps) {
   const isGraded = selectedAnswer !== null;
   const isCorrect = isGraded && isCorrectOption(question, selectedAnswer);
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
-      <div className="text-sm text-gray-500">
-        {index + 1} / {total}
+      <div className="flex items-center justify-between text-sm text-gray-500">
+        <span>
+          {index + 1} / {total}
+        </span>
+        <button
+          type="button"
+          onClick={onFavorite}
+          disabled={isFavorited}
+          className="text-yellow-600 disabled:text-yellow-600"
+        >
+          {isFavorited ? "★ 즐겨찾기 완료" : "☆ 즐겨찾기"}
+        </button>
       </div>
 
       <p className="text-lg font-medium whitespace-pre-wrap">{question.stem}</p>

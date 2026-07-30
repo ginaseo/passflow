@@ -23,3 +23,13 @@ export interface DashboardSummary {
   totalCount: number;
   totalAccuracy: number;
 }
+
+export interface WrongNote {
+  questionId: string;
+  addedAt: number;
+}
+
+export interface Favorite {
+  questionId: string;
+  addedAt: number;
+}
