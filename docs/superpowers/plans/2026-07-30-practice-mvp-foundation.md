@@ -31,19 +31,32 @@
 - `src/repositories/ProgressRepository.test.ts`의 "오늘/전체" 테스트가 실제 `Date.now()`에 의존 — DST/자정걸침 이론상 플레이키 가능. 이 프로젝트는 한국(DST 없음)·CI는 보통 UTC(DST 없음)라 실질 리스크 거의 0, 급하지 않음
 - `QuestionRepository.ts`(`loadExam`/`loadIndex`)와 `app/practice/page.tsx`의 fetch가 `res.ok` 체크 없이 바로 `.json()` 호출 — 404/5xx 시 에러 메시지가 불명확(`SyntaxError`)해지지만, 이미 `.catch`/try-catch로 감싸져 있어 사용자에게는 동일한 error phase로 정상 라우팅됨. 개발자 디버깅 편의 개선이지 사용자 영향 없음
 
+**⚠️ 문서-코드 드리프트 안내**: 아래 각 Task의 코드 샘플은 **작성 당시(구현 착수 전)** 스펙이다. 구현 과정의 최종 브랜치 리뷰·fix wave·Codex 리뷰에서 여러 문제가 발견돼 실제 코드는 이미 고쳐졌지만, Task 원문은 그 과정을 기록하는 역사적 스냅샷이라 소급 수정하지 않았다(수정 이력은 git log가 진실원본). CodeRabbit이 PR #1 리뷰에서 이 불일치를 "Major" 8건으로 지적했으나, **전부 문서만 뒤처진 것이고 실제 코드엔 이미 반영돼 있다** — 확인 결과:
+
+| Task 원문이 놓친 것 | 실제로 고친 커밋 |
+|---|---|
+| `answer: number` (복수정답 미처리) | `f74692b` — `Question.answer: number \| number[]`, `isCorrectOption` 추가 |
+| `parseQuestionId`에 `-Q` 없을 때 검증 없음 | `3d08c13` |
+| `getDashboardSummary`가 롤링 24h (캘린더 날짜 아님) | `917d19f` |
+| `loadExam`/`loadIndex` fetch 실패 시 캐시 오염 | `f74692b` |
+| `recordAttempt` 실패 무시 | `f74692b` |
+| `addWrongNote` 미배선(오답 자동등록 안 됨) | `f74692b` |
+| 키보드 핸들러에 모디파이어키 가드 없음 | `f74692b` |
+| 빈 문제풀/로딩실패 시 에러 처리 없음 | `a59ede4` |
+
 ## Global Constraints
 
 - 설계문서 4절 원칙 8번: 모든 비즈니스 로직은 순수 함수로, UI·Repository에 직접 의존하지 않는다.
 - 설계문서 8절: `/lib`의 순수 함수만 Vitest로 테스트한다. UI 컴포넌트 자동 테스트는 Phase 1 범위 밖.
 - 설계문서 3.3절(2026-07-30 개정): 관련이론은 `sinagong` 있으면 `theory_map.json` 1순위, 없으면 과목 시작페이지 2순위. **주의**: 같은 문서 5절 177행은 개정 전 문구("과목 시작 페이지로 이동")가 남아 있다 — 3.3절이 최신이므로 그쪽을 따른다.
 - `data/exam_*.json`, `data/theory_map.json` 스키마는 읽기 전용, 필드 추가 없음(설계문서 3.1절).
-- `questionId` 형식은 `${examId}-Qqnum}` 고정(예: `2020-1-2-Q45` — examId 자체에 하이픈이 있을 수 있음에 주의).
+- `questionId` 형식은 `${examId}-Q${qnum}` 고정(예: `2020-1-2-Q45` — examId 자체에 하이픈이 있을 수 있음에 주의).
 
 ---
 
 ## 파일 구조
 
-```
+```text
 src/types/question.ts        Question, Exam, ExamSummary
 src/types/theory.ts          TheoryEntry, TheoryLink
 src/types/progress.ts        Attempt, QuestionStats, DashboardSummary, Mode
