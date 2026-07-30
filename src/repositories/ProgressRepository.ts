@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { isSameLocalDay } from "@/lib/timer";
 import type { Attempt, DashboardSummary, QuestionStats } from "@/types/progress";
 
 export interface ProgressRepository {
@@ -9,8 +10,6 @@ export interface ProgressRepository {
   addWrongNote(questionId: string): Promise<void>;
   addFavorite(questionId: string): Promise<void>;
 }
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 export class IndexedDbProgressRepository implements ProgressRepository {
   async recordAttempt(attempt: Omit<Attempt, "id">): Promise<void> {
@@ -62,7 +61,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   async getDashboardSummary(): Promise<DashboardSummary> {
     const attempts = await this.getAttempts();
     const now = Date.now();
-    const today = attempts.filter((a) => now - a.solvedAt < ONE_DAY_MS);
+    const today = attempts.filter((a) => isSameLocalDay(a.solvedAt, now));
 
     const accuracy = (list: Attempt[]) =>
       list.length === 0 ? 0 : list.filter((a) => a.isCorrect).length / list.length;
