@@ -27,6 +27,7 @@ export default function PracticePage() {
 
     try {
       const theoryMapPromise = questionRepository.getTheoryMap();
+      theoryMapPromise.catch(() => {}); // 실제 에러 처리는 아래 await 시점에서 수행됨 — unhandled rejection 방지용
       let questions: Question[];
 
       if (value.entryType === "round") {
