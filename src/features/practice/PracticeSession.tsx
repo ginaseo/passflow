@@ -20,6 +20,7 @@ const progressRepository = new IndexedDbProgressRepository();
 export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSessionProps) {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [favorited, setFavorited] = useState<Record<number, boolean>>({});
   const [questionStartedAt, setQuestionStartedAt] = useState(() => Date.now());
 
   const question = questions[current];
@@ -56,6 +57,14 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
         .addWrongNote(question.questionId)
         .catch((err) => console.error("addWrongNote failed:", err));
     }
+  }
+
+  function toggleFavorite() {
+    if (favorited[current]) return;
+    setFavorited((prev) => ({ ...prev, [current]: true }));
+    progressRepository
+      .addFavorite(question.questionId)
+      .catch((err) => console.error("addFavorite failed:", err));
   }
 
   useEffect(() => {
@@ -97,7 +106,9 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
         total={questions.length}
         selectedAnswer={selectedAnswer}
         theoryLink={selectedAnswer !== null ? theoryLink : null}
+        isFavorited={favorited[current] ?? false}
         onSelect={select}
+        onFavorite={toggleFavorite}
       />
       <div className="max-w-xl mx-auto w-full flex justify-between px-6 text-sm text-gray-500">
         <button
