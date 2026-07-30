@@ -1,9 +1,11 @@
 import { makeQuestionId, parseQuestionId } from "@/lib/questionId";
 import type { ExamSummary, Question } from "@/types/question";
+import type { TheoryMap } from "@/types/theory";
 
 export interface QuestionRepository {
   getQuestion(questionId: string): Promise<Question>;
   getQuestions(filter: { examId?: string; subject?: number }): Promise<Question[]>;
+  getTheoryMap(): Promise<TheoryMap>;
 }
 
 interface RawQuestion {
@@ -27,6 +29,7 @@ interface RawExam {
 export class JsonQuestionRepository implements QuestionRepository {
   private examCache = new Map<string, Promise<Question[]>>();
   private indexCache: Promise<ExamSummary[]> | null = null;
+  private theoryMapCache: Promise<TheoryMap> | null = null;
 
   private loadExam(examId: string): Promise<Question[]> {
     let cached = this.examCache.get(examId);
@@ -68,6 +71,18 @@ export class JsonQuestionRepository implements QuestionRepository {
         });
     }
     return this.indexCache;
+  }
+
+  async getTheoryMap(): Promise<TheoryMap> {
+    if (!this.theoryMapCache) {
+      this.theoryMapCache = fetch("/data/theory_map.json")
+        .then((res) => res.json() as Promise<TheoryMap>)
+        .catch((err) => {
+          this.theoryMapCache = null;
+          throw err;
+        });
+    }
+    return this.theoryMapCache;
   }
 
   async getQuestion(questionId: string): Promise<Question> {

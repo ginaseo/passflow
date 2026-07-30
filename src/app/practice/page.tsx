@@ -29,7 +29,7 @@ export default function PracticePage() {
         questionRepository.getQuestions(
           value.subject === "all" ? {} : { subject: value.subject }
         ),
-        fetch("/data/theory_map.json").then((res) => res.json() as Promise<TheoryMap>),
+        questionRepository.getTheoryMap(),
       ]);
 
       const questions = pickRandomQuestions(pool, value.count);

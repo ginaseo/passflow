@@ -78,6 +78,45 @@ describe("IndexedDbProgressRepository", () => {
     expect(await db.get("favorites", "2023-1-Q1")).toBeDefined();
   });
 
+  it("getWrongNotes / getFavorites는 추가한 항목을 전부 반환한다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.addWrongNote("Q1");
+    await repo.addWrongNote("Q2");
+    await repo.addFavorite("Q3");
+
+    const wrongNotes = await repo.getWrongNotes();
+    const favorites = await repo.getFavorites();
+
+    expect(wrongNotes.map((n) => n.questionId).sort()).toEqual(["Q1", "Q2"]);
+    expect(favorites.map((n) => n.questionId)).toEqual(["Q3"]);
+  });
+
+  it("아무것도 추가 안 했으면 getWrongNotes / getFavorites는 빈 배열", async () => {
+    const repo = new IndexedDbProgressRepository();
+    expect(await repo.getWrongNotes()).toEqual([]);
+    expect(await repo.getFavorites()).toEqual([]);
+  });
+
+  it("removeWrongNote / removeFavorite는 해당 항목만 지운다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.addWrongNote("Q1");
+    await repo.addWrongNote("Q2");
+    await repo.addFavorite("Q3");
+
+    await repo.removeWrongNote("Q1");
+    await repo.removeFavorite("Q3");
+
+    expect((await repo.getWrongNotes()).map((n) => n.questionId)).toEqual(["Q2"]);
+    expect(await repo.getFavorites()).toEqual([]);
+  });
+
+  it("같은 questionId를 두 번 addWrongNote해도 중복 저장되지 않는다 (upsert)", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.addWrongNote("Q1");
+    await repo.addWrongNote("Q1");
+    expect(await repo.getWrongNotes()).toHaveLength(1);
+  });
+
   it("getDashboardSummary는 오늘/전체 정답률을 계산한다", async () => {
     const repo = new IndexedDbProgressRepository();
     const oneDayMs = 24 * 60 * 60 * 1000;
