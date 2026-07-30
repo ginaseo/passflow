@@ -107,10 +107,15 @@ export default function ReviewPage() {
     const removingFromTab = tab;
     const requestId = ++latestRequestId.current;
 
-    if (removingFromTab === "wrong") {
-      await progressRepository.removeWrongNote(questionId).catch((err) => console.error(err));
-    } else if (removingFromTab === "favorite") {
-      await progressRepository.removeFavorite(questionId).catch((err) => console.error(err));
+    try {
+      if (removingFromTab === "wrong") {
+        await progressRepository.removeWrongNote(questionId);
+      } else if (removingFromTab === "favorite") {
+        await progressRepository.removeFavorite(questionId);
+      }
+    } catch (err) {
+      console.error("removeWrongNote/removeFavorite failed:", err);
+      return; // 삭제가 실패했으면 화면에서도 안 지운다 — DB에 그대로 남아있으니 목록도 그래야 맞다.
     }
 
     // 삭제가 끝나기 전에 사용자가 다른 탭으로 전환했으면, 지금 화면엔 그 탭의 문항이
