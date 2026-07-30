@@ -6,29 +6,31 @@ import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
 
-const EMPTY_SUMMARY: DashboardSummary = {
-  todayCount: 0,
-  todayAccuracy: 0,
-  totalCount: 0,
-  totalAccuracy: 0,
-};
-
 function formatPercent(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     progressRepository.getDashboardSummary().then(
       (result) => setSummary(result),
       (err) => {
         console.error("getDashboardSummary failed:", err);
-        setSummary(EMPTY_SUMMARY);
+        setError(true);
       }
     );
   }, []);
+
+  if (error) {
+    return (
+      <p className="text-center p-10 text-red-700">
+        학습 기록을 불러오지 못했다. 다시 시도해달라.
+      </p>
+    );
+  }
 
   if (!summary) {
     return <p className="text-center p-10">불러오는 중...</p>;
