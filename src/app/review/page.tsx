@@ -125,10 +125,11 @@ export default function ReviewPage() {
     setQuestions((prev) => prev.filter((q) => q.questionId !== questionId));
   }
 
-  async function handleRetryAll() {
+  async function handleRetry(selectedQuestions: Question[]) {
+    if (selectedQuestions.length === 0) return;
     try {
       const theoryMap = await questionRepository.getTheoryMap();
-      setPhase({ kind: "active", questions, theoryMap });
+      setPhase({ kind: "active", questions: selectedQuestions, theoryMap });
     } catch {
       setPhase({ kind: "error", message: "관련 이론 데이터를 불러오지 못했다. 다시 시도해달라." });
     }
@@ -202,7 +203,7 @@ export default function ReviewPage() {
           questions={questions}
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
-          onRetryAll={handleRetryAll}
+          onRetry={handleRetry}
         />
       )}
     </div>
