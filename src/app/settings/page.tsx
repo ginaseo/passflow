@@ -1,0 +1,110 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
+import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { DEFAULT_SETTINGS, type Settings, type TimeoutBehavior } from "@/types/settings";
+import type { Mode } from "@/types/progress";
+
+const settingsRepository = new IndexedDbSettingsRepository();
+const progressRepository = new IndexedDbProgressRepository();
+
+const TIMEOUT_LABEL: Record<TimeoutBehavior, string> = {
+  wrong: "오답처리",
+  warn: "경고만",
+  ignore: "무시",
+};
+
+export default function SettingsPage() {
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [resetDone, setResetDone] = useState(false);
+
+  useEffect(() => {
+    settingsRepository.getSettings().then(
+      (result) => setSettings(result),
+      (err) => {
+        console.error("getSettings failed:", err);
+        setSettings(DEFAULT_SETTINGS);
+      }
+    );
+  }, []);
+
+  function update(next: Settings) {
+    setSettings(next);
+    settingsRepository.updateSettings(next).catch((err) => console.error("updateSettings failed:", err));
+  }
+
+  function handleReset() {
+    if (!window.confirm("모든 풀이 기록·오답노트·즐겨찾기를 지운다. 되돌릴 수 없다. 계속할까?")) return;
+    progressRepository.resetAll().then(
+      () => setResetDone(true),
+      (err) => console.error("resetAll failed:", err)
+    );
+  }
+
+  if (!settings) {
+    return <p className="text-center p-10">불러오는 중...</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-6 max-w-md mx-auto p-6">
+      <h1 className="text-xl font-bold">설정</h1>
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium">학습</span>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={settings.autoSaveWrongNotes}
+            onChange={(e) => update({ ...settings, autoSaveWrongNotes: e.target.checked })}
+          />
+          오답 자동저장 (학습모드)
+        </label>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium">기본 문제풀이 모드</span>
+        <div className="flex gap-2">
+          {(["study", "exam"] as Mode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => update({ ...settings, defaultMode: m })}
+              className={`px-3 py-1.5 rounded border ${settings.defaultMode === m ? "bg-black text-white" : ""}`}
+            >
+              {m === "study" ? "학습모드" : "시험모드"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium">시험모드 시간초과 처리</span>
+        <div className="flex gap-2">
+          {(["wrong", "warn", "ignore"] as TimeoutBehavior[]).map((behavior) => (
+            <button
+              key={behavior}
+              type="button"
+              onClick={() => update({ ...settings, timeoutBehavior: behavior })}
+              className={`px-3 py-1.5 rounded border ${settings.timeoutBehavior === behavior ? "bg-black text-white" : ""}`}
+            >
+              {TIMEOUT_LABEL[behavior]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium">데이터</span>
+        <button
+          type="button"
+          onClick={handleReset}
+          className="self-start px-3 py-1.5 rounded border border-red-600 text-red-600"
+        >
+          전체 기록 초기화
+        </button>
+        {resetDone && <p className="text-sm text-green-700">초기화됐다.</p>}
+      </div>
+    </div>
+  );
+}
