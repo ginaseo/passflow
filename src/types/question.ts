@@ -5,7 +5,7 @@ export interface Question {
   stem: string;
   options: string[];
   subject: number;
-  answer: number;
+  answer: number | number[];
   explanation: string;
   image: string | null;
   sinagong?: string;

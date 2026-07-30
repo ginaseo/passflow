@@ -108,4 +108,30 @@ describe("JsonQuestionRepository", () => {
     );
     expect(examFetchCalls).toHaveLength(1);
   });
+
+  it("loadExam의 fetch가 실패해도 캐시에 남지 않아 재시도 시 다시 fetch한다", async () => {
+    const repo = new JsonQuestionRepository();
+    const mockFetch = vi.fn(mockFetchJson);
+    mockFetch.mockRejectedValueOnce(new Error("network error"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(repo.getQuestions({ examId: "2023-1" })).rejects.toThrow("network error");
+
+    const qs = await repo.getQuestions({ examId: "2023-1" });
+    expect(qs).toHaveLength(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("loadIndex의 fetch가 실패해도 캐시에 남지 않아 재시도 시 다시 fetch한다", async () => {
+    const repo = new JsonQuestionRepository();
+    const mockFetch = vi.fn(mockFetchJson);
+    mockFetch.mockRejectedValueOnce(new Error("network error"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(repo.getQuestions({ subject: 1 })).rejects.toThrow("network error");
+
+    const qs = await repo.getQuestions({ subject: 1 });
+    expect(qs.map((q) => q.questionId).sort()).toEqual(["2023-1-Q1", "2023-2-Q1"]);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+  });
 });

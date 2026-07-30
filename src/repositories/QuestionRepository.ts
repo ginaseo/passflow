@@ -12,7 +12,7 @@ interface RawQuestion {
   options: string[];
   subject: number;
   subjectName?: string;
-  answer: number;
+  answer: number | number[];
   explanation: string;
   image: string | null;
   sinagong?: string;
@@ -48,7 +48,11 @@ export class JsonQuestionRepository implements QuestionRepository {
               sinagong: q.sinagong,
             })
           )
-        );
+        )
+        .catch((err) => {
+          this.examCache.delete(examId);
+          throw err;
+        });
       this.examCache.set(examId, cached);
     }
     return cached;
@@ -56,9 +60,12 @@ export class JsonQuestionRepository implements QuestionRepository {
 
   private loadIndex(): Promise<ExamSummary[]> {
     if (!this.indexCache) {
-      this.indexCache = fetch("/data/exams_index.json").then(
-        (res) => res.json() as Promise<ExamSummary[]>
-      );
+      this.indexCache = fetch("/data/exams_index.json")
+        .then((res) => res.json() as Promise<ExamSummary[]>)
+        .catch((err) => {
+          this.indexCache = null;
+          throw err;
+        });
     }
     return this.indexCache;
   }

@@ -1,7 +1,6 @@
 import type { Question } from "@/types/question";
 import type { TheoryLink, TheoryMap } from "@/types/theory";
 
-// data/theory_map.json 376개 항목을 subject별로 실측한 최소 page 값 (2026-07-30 기준).
 export const SUBJECT_NAMES: Record<number, string> = {
   1: "1과목 소프트웨어 설계",
   2: "2과목 소프트웨어 개발",
@@ -10,6 +9,7 @@ export const SUBJECT_NAMES: Record<number, string> = {
   5: "5과목 정보시스템 구축 관리",
 };
 
+// data/theory_map.json 376개 항목을 subject별로 실측한 최소 page 값 (2026-07-30 기준).
 export const SUBJECT_START_PAGES: Record<number, number> = {
   1: 4,
   2: 25,

@@ -1,5 +1,6 @@
 "use client";
 
+import { isCorrectOption } from "@/lib/grading";
 import type { Question } from "@/types/question";
 import type { TheoryLink } from "@/types/theory";
 
@@ -21,7 +22,7 @@ export function QuestionCard({
   onSelect,
 }: QuestionCardProps) {
   const isGraded = selectedAnswer !== null;
-  const isCorrect = isGraded && selectedAnswer === question.answer;
+  const isCorrect = isGraded && isCorrectOption(question, selectedAnswer);
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
@@ -39,7 +40,7 @@ export function QuestionCard({
         {question.options.map((option, i) => {
           const optionNumber = i + 1;
           const isSelected = selectedAnswer === optionNumber;
-          const isAnswer = optionNumber === question.answer;
+          const isAnswer = isCorrectOption(question, optionNumber);
 
           let style = "border-gray-300";
           if (isGraded && isAnswer) style = "border-green-600 bg-green-50";

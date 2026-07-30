@@ -22,4 +22,19 @@ describe("gradeAnswer", () => {
   it("선택한 답이 정답과 다르면 false", () => {
     expect(gradeAnswer(baseQuestion, 1)).toBe(false);
   });
+
+  it("answer가 배열(복수 정답)이면 포함된 옵션은 true, 아니면 false", () => {
+    const multiAnswerQuestion: Question = { ...baseQuestion, answer: [3, 4] };
+    expect(gradeAnswer(multiAnswerQuestion, 3)).toBe(true);
+    expect(gradeAnswer(multiAnswerQuestion, 4)).toBe(true);
+    expect(gradeAnswer(multiAnswerQuestion, 1)).toBe(false);
+  });
+
+  it("answer가 모든 옵션을 포함한 배열(전항정답)이면 모든 선택지가 true", () => {
+    const allCorrectQuestion: Question = { ...baseQuestion, answer: [1, 2, 3, 4] };
+    expect(gradeAnswer(allCorrectQuestion, 1)).toBe(true);
+    expect(gradeAnswer(allCorrectQuestion, 2)).toBe(true);
+    expect(gradeAnswer(allCorrectQuestion, 3)).toBe(true);
+    expect(gradeAnswer(allCorrectQuestion, 4)).toBe(true);
+  });
 });

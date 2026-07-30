@@ -39,18 +39,27 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
     setAnswers((prev) => ({ ...prev, [current]: answer }));
 
     const isCorrect = gradeAnswer(question, answer);
-    void progressRepository.recordAttempt({
-      questionId: question.questionId,
-      solvedAt: Date.now(),
-      mode: "study",
-      selectedAnswer: answer,
-      isCorrect,
-      solveTimeMs: Date.now() - questionStartedAt,
-    });
+    progressRepository
+      .recordAttempt({
+        questionId: question.questionId,
+        solvedAt: Date.now(),
+        mode: "study",
+        selectedAnswer: answer,
+        isCorrect,
+        solveTimeMs: Date.now() - questionStartedAt,
+      })
+      .catch((err) => console.error("recordAttempt failed:", err));
+
+    if (!isCorrect) {
+      progressRepository
+        .addWrongNote(question.questionId)
+        .catch((err) => console.error("addWrongNote failed:", err));
+    }
   }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (["1", "2", "3", "4"].includes(e.key)) {
         select(Number(e.key));
       } else if (e.key === " ") {
