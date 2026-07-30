@@ -82,6 +82,15 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="max-w-xl mx-auto w-full flex justify-end px-6">
+        <button
+          type="button"
+          onClick={() => onFinish(summarizeSession(questions, answers))}
+          className="text-sm text-gray-500 underline"
+        >
+          그만두기
+        </button>
+      </div>
       <QuestionCard
         question={question}
         index={current}
@@ -91,7 +100,12 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
         onSelect={select}
       />
       <div className="max-w-xl mx-auto w-full flex justify-between px-6 text-sm text-gray-500">
-        <button type="button" onClick={() => goTo(current - 1)} disabled={current === 0}>
+        <button
+          type="button"
+          onClick={() => goTo(current - 1)}
+          disabled={current === 0}
+          className="disabled:opacity-40 disabled:cursor-not-allowed"
+        >
           ← 이전
         </button>
         <span>Space: 다음 · 1~4: 답 선택</span>
