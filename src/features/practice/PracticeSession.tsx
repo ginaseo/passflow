@@ -43,6 +43,22 @@ export function PracticeSession({
     [question, theoryMap]
   );
   const showFeedback = mode === "study" && selectedAnswer !== null;
+
+  useEffect(() => {
+    progressRepository.getFavorites().then(
+      (favorites) => {
+        const favoritedIds = new Set(favorites.map((f) => f.questionId));
+        setFavorited((prev) => {
+          const next = { ...prev };
+          questions.forEach((q, i) => {
+            if (favoritedIds.has(q.questionId)) next[i] = true;
+          });
+          return next;
+        });
+      },
+      (err) => console.error("getFavorites failed:", err)
+    );
+  }, [questions]);
   const remaining =
     timeLimitMs !== null ? remainingMs(sessionStartedAt, now, timeLimitMs) : null;
 
