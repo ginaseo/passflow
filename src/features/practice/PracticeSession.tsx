@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { QuestionCard } from "./QuestionCard";
 import { gradeAnswer } from "@/lib/grading";
 import { resolveTheoryLink } from "@/lib/theory";
+import { summarizeSession, type SessionSummary } from "@/lib/summary";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
@@ -11,7 +12,7 @@ import type { TheoryMap } from "@/types/theory";
 interface PracticeSessionProps {
   questions: Question[];
   theoryMap: TheoryMap;
-  onFinish: () => void;
+  onFinish: (summary: SessionSummary) => void;
 }
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -65,7 +66,7 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
       } else if (e.key === " ") {
         e.preventDefault();
         if (current === questions.length - 1) {
-          onFinish();
+          onFinish(summarizeSession(questions, answers));
         } else {
           goTo(current + 1);
         }
@@ -95,7 +96,11 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
         </button>
         <span>Space: 다음 · 1~4: 답 선택</span>
         {current === questions.length - 1 ? (
-          <button type="button" onClick={onFinish} className="text-blue-700 font-medium">
+          <button
+            type="button"
+            onClick={() => onFinish(summarizeSession(questions, answers))}
+            className="text-blue-700 font-medium"
+          >
             종료
           </button>
         ) : (
