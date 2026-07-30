@@ -45,9 +45,11 @@ async function hydrate(questionIds: string[]): Promise<Question[]> {
 async function fetchTabQuestions(nextTab: Tab): Promise<Question[]> {
   let questionIds: string[];
   if (nextTab === "wrong") {
-    questionIds = (await progressRepository.getWrongNotes()).map((n) => n.questionId);
+    const notes = await progressRepository.getWrongNotes();
+    questionIds = notes.sort((a, b) => b.addedAt - a.addedAt).map((n) => n.questionId);
   } else if (nextTab === "favorite") {
-    questionIds = (await progressRepository.getFavorites()).map((n) => n.questionId);
+    const favorites = await progressRepository.getFavorites();
+    questionIds = favorites.sort((a, b) => b.addedAt - a.addedAt).map((n) => n.questionId);
   } else {
     const attempts = await progressRepository.getAttempts();
     questionIds = getRecentlySolvedQuestionIds(attempts, 20);
