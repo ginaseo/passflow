@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { elapsedMs, isSameLocalDay, isTimedOut } from "./timer";
+import { elapsedMs, formatDuration, isSameLocalDay, isTimedOut, remainingMs } from "./timer";
 
 describe("elapsedMs", () => {
   it("now - startedAt을 반환한다", () => {
@@ -38,5 +38,29 @@ describe("isSameLocalDay", () => {
     const early = new Date(2026, 6, 30, 0, 30).getTime();
     const late = new Date(2026, 6, 30, 23, 30).getTime();
     expect(isSameLocalDay(early, late)).toBe(true);
+  });
+});
+
+describe("remainingMs", () => {
+  it("제한시간에서 경과시간을 뺀 값을 반환한다", () => {
+    expect(remainingMs(0, 30_000, 60_000)).toBe(30_000);
+  });
+
+  it("경과시간이 제한시간을 넘으면 0으로 clamp한다", () => {
+    expect(remainingMs(0, 90_000, 60_000)).toBe(0);
+  });
+});
+
+describe("formatDuration", () => {
+  it("mm:ss 형식으로 변환한다", () => {
+    expect(formatDuration(61_000)).toBe("1:01");
+  });
+
+  it("초 단위 미만은 올림 처리한다", () => {
+    expect(formatDuration(59_500)).toBe("1:00");
+  });
+
+  it("0ms는 0:00", () => {
+    expect(formatDuration(0)).toBe("0:00");
   });
 });
