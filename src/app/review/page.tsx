@@ -7,17 +7,20 @@ import { getRecentlySolvedQuestionIds } from "@/lib/recentlySolved";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
+import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 const questionRepository = new JsonQuestionRepository();
 const progressRepository = new IndexedDbProgressRepository();
+const settingsRepository = new IndexedDbSettingsRepository();
 
 type Tab = "wrong" | "favorite" | "recent";
 
 type Phase =
   | { kind: "list" }
-  | { kind: "active"; questions: Question[]; theoryMap: TheoryMap }
+  | { kind: "active"; questions: Question[]; theoryMap: TheoryMap; autoSaveWrongNotes: boolean }
   | { kind: "done"; summary: SessionSummary }
   | { kind: "error"; message: string };
 
@@ -130,8 +133,16 @@ export default function ReviewPage() {
   async function handleRetry(selectedQuestions: Question[]) {
     if (selectedQuestions.length === 0) return;
     try {
-      const theoryMap = await questionRepository.getTheoryMap();
-      setPhase({ kind: "active", questions: selectedQuestions, theoryMap });
+      const [theoryMap, settings] = await Promise.all([
+        questionRepository.getTheoryMap(),
+        settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS),
+      ]);
+      setPhase({
+        kind: "active",
+        questions: selectedQuestions,
+        theoryMap,
+        autoSaveWrongNotes: settings.autoSaveWrongNotes,
+      });
     } catch {
       setPhase({ kind: "error", message: "관련 이론 데이터를 불러오지 못했다. 다시 시도해달라." });
     }
@@ -181,6 +192,7 @@ export default function ReviewPage() {
         theoryMap={phase.theoryMap}
         mode="study"
         timeLimitMs={null}
+        autoSaveWrongNotes={phase.autoSaveWrongNotes}
         onFinish={(summary) => setPhase({ kind: "done", summary })}
       />
     );

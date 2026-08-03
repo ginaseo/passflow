@@ -13,6 +13,7 @@ export interface ProgressRepository {
   getFavorites(): Promise<Favorite[]>;
   removeWrongNote(questionId: string): Promise<void>;
   removeFavorite(questionId: string): Promise<void>;
+  resetAll(): Promise<void>;
 }
 
 export class IndexedDbProgressRepository implements ProgressRepository {
@@ -106,5 +107,17 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   async removeFavorite(questionId: string): Promise<void> {
     const db = await getDb();
     await db.delete("favorites", questionId);
+  }
+
+  async resetAll(): Promise<void> {
+    const db = await getDb();
+    const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
+    await Promise.all([
+      tx.objectStore("attempts").clear(),
+      tx.objectStore("questionStats").clear(),
+      tx.objectStore("wrongNotes").clear(),
+      tx.objectStore("favorites").clear(),
+    ]);
+    await tx.done;
   }
 }

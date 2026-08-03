@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/practice", label: "문제풀이" },
   { href: "/review", label: "복습" },
   { href: "/dashboard", label: "대시보드" },
+  { href: "/settings", label: "설정" },
 ] as const;
 
 export function NavBar() {

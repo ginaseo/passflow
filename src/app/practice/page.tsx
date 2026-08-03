@@ -6,16 +6,26 @@ import { PracticeSession } from "@/features/practice/PracticeSession";
 import { pickRandomQuestions } from "@/lib/sampling";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 const questionRepository = new JsonQuestionRepository();
+const settingsRepository = new IndexedDbSettingsRepository();
 
 type Phase =
   | { kind: "setup" }
   | { kind: "loading" }
-  | { kind: "active"; questions: Question[]; theoryMap: TheoryMap; mode: Mode; timeLimitMs: number | null }
+  | {
+      kind: "active";
+      questions: Question[];
+      theoryMap: TheoryMap;
+      mode: Mode;
+      timeLimitMs: number | null;
+      autoSaveWrongNotes: boolean;
+    }
   | { kind: "done"; summary: SessionSummary }
   | { kind: "error"; message: string };
 
@@ -28,6 +38,9 @@ export default function PracticePage() {
     try {
       const theoryMapPromise = questionRepository.getTheoryMap();
       theoryMapPromise.catch(() => {}); // 실제 에러 처리는 아래 await 시점에서 수행됨 — unhandled rejection 방지용
+      // 설정 조회 실패는 세션 시작을 막지 않는다 — 기본값으로 대체
+      const settingsPromise = settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS);
+
       let questions: Question[];
 
       if (value.entryType === "round") {
@@ -41,6 +54,7 @@ export default function PracticePage() {
       }
 
       const theoryMap = await theoryMapPromise;
+      const settings = await settingsPromise;
 
       if (questions.length === 0) {
         setPhase({ kind: "error", message: "문제를 찾을 수 없다. 다시 시도해달라." });
@@ -53,6 +67,7 @@ export default function PracticePage() {
         theoryMap,
         mode: value.mode,
         timeLimitMs: value.timeLimitMs,
+        autoSaveWrongNotes: settings.autoSaveWrongNotes,
       });
     } catch {
       setPhase({ kind: "error", message: "문제를 불러오지 못했다. 다시 시도해달라." });
@@ -107,6 +122,7 @@ export default function PracticePage() {
       theoryMap={phase.theoryMap}
       mode={phase.mode}
       timeLimitMs={phase.timeLimitMs}
+      autoSaveWrongNotes={phase.autoSaveWrongNotes}
       onFinish={(summary) => setPhase({ kind: "done", summary })}
     />
   );

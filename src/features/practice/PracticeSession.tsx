@@ -16,6 +16,7 @@ interface PracticeSessionProps {
   theoryMap: TheoryMap;
   mode: Mode;
   timeLimitMs: number | null;
+  autoSaveWrongNotes: boolean;
   onFinish: (summary: SessionSummary) => void;
 }
 
@@ -26,6 +27,7 @@ export function PracticeSession({
   theoryMap,
   mode,
   timeLimitMs,
+  autoSaveWrongNotes,
   onFinish,
 }: PracticeSessionProps) {
   const [current, setCurrent] = useState(0);
@@ -43,6 +45,8 @@ export function PracticeSession({
     [question, theoryMap]
   );
   const showFeedback = mode === "study" && selectedAnswer !== null;
+  const remaining =
+    timeLimitMs !== null ? remainingMs(sessionStartedAt, now, timeLimitMs) : null;
 
   useEffect(() => {
     progressRepository.getFavorites().then(
@@ -59,8 +63,6 @@ export function PracticeSession({
       (err) => console.error("getFavorites failed:", err)
     );
   }, [questions]);
-  const remaining =
-    timeLimitMs !== null ? remainingMs(sessionStartedAt, now, timeLimitMs) : null;
 
   function goTo(nextIndex: number) {
     if (nextIndex < 0 || nextIndex >= questions.length) return;
@@ -85,7 +87,7 @@ export function PracticeSession({
         })
         .catch((err) => console.error("recordAttempt failed:", err));
 
-      if (!isCorrect) {
+      if (!isCorrect && autoSaveWrongNotes) {
         progressRepository
           .addWrongNote(question.questionId)
           .catch((err) => console.error("addWrongNote failed:", err));

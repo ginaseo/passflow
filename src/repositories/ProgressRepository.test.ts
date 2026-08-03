@@ -110,6 +110,32 @@ describe("IndexedDbProgressRepository", () => {
     expect(await repo.getFavorites()).toEqual([]);
   });
 
+  it("resetAll은 attempts/questionStats/wrongNotes/favorites를 전부 비운다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.recordAttempt({
+      questionId: "Q1",
+      solvedAt: 1000,
+      mode: "study",
+      selectedAnswer: 1,
+      isCorrect: true,
+      solveTimeMs: 1000,
+    });
+    await repo.addWrongNote("Q1");
+    await repo.addFavorite("Q1");
+
+    await repo.resetAll();
+
+    expect(await repo.getAttempts()).toEqual([]);
+    expect(await repo.getWrongNotes()).toEqual([]);
+    expect(await repo.getFavorites()).toEqual([]);
+    expect(await repo.getQuestionStats("Q1")).toEqual({
+      questionId: "Q1",
+      correctCount: 0,
+      wrongCount: 0,
+      lastSolvedAt: 0,
+    });
+  });
+
   it("같은 questionId를 두 번 addWrongNote해도 중복 저장되지 않는다 (upsert)", async () => {
     const repo = new IndexedDbProgressRepository();
     await repo.addWrongNote("Q1");
