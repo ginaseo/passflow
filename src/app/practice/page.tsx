@@ -7,6 +7,7 @@ import { pickRandomQuestions } from "@/lib/sampling";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
@@ -37,8 +38,8 @@ export default function PracticePage() {
     try {
       const theoryMapPromise = questionRepository.getTheoryMap();
       theoryMapPromise.catch(() => {}); // 실제 에러 처리는 아래 await 시점에서 수행됨 — unhandled rejection 방지용
-      const settingsPromise = settingsRepository.getSettings();
-      settingsPromise.catch(() => {});
+      // 설정 조회 실패는 세션 시작을 막지 않는다 — 기본값으로 대체
+      const settingsPromise = settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS);
 
       let questions: Question[];
 

@@ -8,6 +8,7 @@ import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
@@ -134,7 +135,7 @@ export default function ReviewPage() {
     try {
       const [theoryMap, settings] = await Promise.all([
         questionRepository.getTheoryMap(),
-        settingsRepository.getSettings(),
+        settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS),
       ]);
       setPhase({
         kind: "active",

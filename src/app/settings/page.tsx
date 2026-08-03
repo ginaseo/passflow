@@ -30,8 +30,12 @@ export default function SettingsPage() {
   }, []);
 
   function update(next: Settings) {
+    const prev = settings;
     setSettings(next);
-    settingsRepository.updateSettings(next).catch((err) => console.error("updateSettings failed:", err));
+    settingsRepository.updateSettings(next).catch((err) => {
+      console.error("updateSettings failed:", err);
+      setSettings(prev);
+    });
   }
 
   function handleReset() {
@@ -69,6 +73,7 @@ export default function SettingsPage() {
             <button
               key={m}
               type="button"
+              aria-pressed={settings.defaultMode === m}
               onClick={() => update({ ...settings, defaultMode: m })}
               className={`px-3 py-1.5 rounded border ${settings.defaultMode === m ? "bg-black text-white" : ""}`}
             >
@@ -88,6 +93,7 @@ export default function SettingsPage() {
             <button
               key={behavior}
               type="button"
+              aria-pressed={settings.timeoutBehavior === behavior}
               onClick={() => update({ ...settings, timeoutBehavior: behavior })}
               className={`px-3 py-1.5 rounded border ${settings.timeoutBehavior === behavior ? "bg-black text-white" : ""}`}
             >
