@@ -2,7 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   activateStorageFallback,
+  hasLocalStorageData,
   isStorageFallbackActive,
+  readAndClearLocalStorage,
   readLocalStorage,
   removeLocalStorageRecord,
   subscribeStorageFallback,
@@ -65,5 +67,17 @@ describe("storageFallback", () => {
     removeLocalStorageRecord("notes", "q1");
 
     expect(readLocalStorage("notes", {})).toEqual({});
+  });
+
+  it("hasLocalStorageData는 저장된 값이 있을 때만 true", () => {
+    expect(hasLocalStorageData("missing")).toBe(false);
+    writeLocalStorage("present", { a: 1 });
+    expect(hasLocalStorageData("present")).toBe(true);
+  });
+
+  it("readAndClearLocalStorage는 값을 읽고 지운다", () => {
+    writeLocalStorage("temp", { a: 1 });
+    expect(readAndClearLocalStorage("temp", { a: 0 })).toEqual({ a: 1 });
+    expect(hasLocalStorageData("temp")).toBe(false);
   });
 });

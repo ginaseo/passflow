@@ -13,6 +13,18 @@ beforeEach(async () => {
 });
 
 describe("IndexedDbSettingsRepository", () => {
+  it("복구된 IndexedDB에 남은 localStorage 폴백 데이터를 병합하고 지운다", async () => {
+    localStorage.setItem("pf_settings_fallback", JSON.stringify({ ...DEFAULT_SETTINGS, autoSaveWrongNotes: false }));
+    const repo = new IndexedDbSettingsRepository();
+
+    const settings = await repo.getSettings();
+
+    expect(settings.autoSaveWrongNotes).toBe(false);
+    expect(localStorage.getItem("pf_settings_fallback")).toBeNull();
+    const db = await getDb();
+    expect((await db.get("settings", "app"))?.autoSaveWrongNotes).toBe(false);
+  });
+
   it("저장된 값이 없으면 DEFAULT_SETTINGS를 반환한다", async () => {
     const repo = new IndexedDbSettingsRepository();
     expect(await repo.getSettings()).toEqual(DEFAULT_SETTINGS);

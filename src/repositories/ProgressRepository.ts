@@ -3,7 +3,9 @@ import { isSameLocalDay } from "@/lib/timer";
 import type { Attempt, DashboardSummary, Favorite, QuestionStats, WrongNote } from "@/types/progress";
 import {
   activateStorageFallback,
+  hasLocalStorageData,
   isStorageFallbackActive,
+  readAndClearLocalStorage,
   readLocalStorage,
   removeLocalStorageRecord,
   upsertLocalStorageRecord,
@@ -12,6 +14,25 @@ import {
 
 const WRONG_NOTES_KEY = "wrongnotes_fallback";
 const FAVORITES_KEY = "favorites_fallback";
+
+let progressReconciled = false;
+
+async function reconcileIfNeeded(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  if (progressReconciled) return;
+  progressReconciled = true;
+  if (hasLocalStorageData(WRONG_NOTES_KEY)) {
+    const notes = readAndClearLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {});
+    const tx = db.transaction("wrongNotes", "readwrite");
+    await Promise.all(Object.values(notes).map((note) => tx.store.put(note)));
+    await tx.done;
+  }
+  if (hasLocalStorageData(FAVORITES_KEY)) {
+    const favorites = readAndClearLocalStorage<Record<string, Favorite>>(FAVORITES_KEY, {});
+    const tx = db.transaction("favorites", "readwrite");
+    await Promise.all(Object.values(favorites).map((favorite) => tx.store.put(favorite)));
+    await tx.done;
+  }
+}
 
 export interface ProgressRepository {
   recordAttempt(attempt: Omit<Attempt, "id">): Promise<void>;
@@ -30,8 +51,14 @@ export interface ProgressRepository {
 export class IndexedDbProgressRepository implements ProgressRepository {
   async recordAttempt(attempt: Omit<Attempt, "id">): Promise<void> {
     if (isStorageFallbackActive()) return;
+    let db;
     try {
-      const db = await getDb();
+      db = await getDb();
+    } catch {
+      activateStorageFallback();
+      return;
+    }
+    try {
       const tx = db.transaction(["attempts", "questionStats"], "readwrite");
 
       await tx.objectStore("attempts").add(attempt as Attempt);
@@ -54,20 +81,25 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
       await tx.done;
     } catch {
-      activateStorageFallback();
+      // attempts/questionStats는 폴백 대상이 아님 — 이 쓰기만 조용히 실패, 다른 스토어엔 전파 안 함
     }
   }
 
   async getAttempts(questionId?: string): Promise<Attempt[]> {
     if (isStorageFallbackActive()) return [];
+    let db;
     try {
-      const db = await getDb();
-      if (questionId) {
-        return db.getAllFromIndex("attempts", "questionId", questionId);
-      }
-      return db.getAll("attempts");
+      db = await getDb();
     } catch {
       activateStorageFallback();
+      return [];
+    }
+    try {
+      if (questionId) {
+        return await db.getAllFromIndex("attempts", "questionId", questionId);
+      }
+      return await db.getAll("attempts");
+    } catch {
       return [];
     }
   }
@@ -75,12 +107,17 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   async getQuestionStats(questionId: string): Promise<QuestionStats> {
     const empty: QuestionStats = { questionId, correctCount: 0, wrongCount: 0, lastSolvedAt: 0 };
     if (isStorageFallbackActive()) return empty;
+    let db;
     try {
-      const db = await getDb();
+      db = await getDb();
+    } catch {
+      activateStorageFallback();
+      return empty;
+    }
+    try {
       const existing = await db.get("questionStats", questionId);
       return existing ?? empty;
     } catch {
-      activateStorageFallback();
       return empty;
     }
   }
@@ -109,6 +146,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     }
     try {
       const db = await getDb();
+      await reconcileIfNeeded(db);
       await db.put("wrongNotes", note);
     } catch {
       activateStorageFallback();
@@ -124,6 +162,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     }
     try {
       const db = await getDb();
+      await reconcileIfNeeded(db);
       await db.put("favorites", favorite);
     } catch {
       activateStorageFallback();
@@ -137,7 +176,8 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     }
     try {
       const db = await getDb();
-      return db.getAll("wrongNotes");
+      await reconcileIfNeeded(db);
+      return await db.getAll("wrongNotes");
     } catch {
       activateStorageFallback();
       return Object.values(readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {}));
@@ -150,7 +190,8 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     }
     try {
       const db = await getDb();
-      return db.getAll("favorites");
+      await reconcileIfNeeded(db);
+      return await db.getAll("favorites");
     } catch {
       activateStorageFallback();
       return Object.values(readLocalStorage<Record<string, Favorite>>(FAVORITES_KEY, {}));
@@ -188,7 +229,6 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   async resetAll(): Promise<void> {
     writeLocalStorage(WRONG_NOTES_KEY, {});
     writeLocalStorage(FAVORITES_KEY, {});
-    if (isStorageFallbackActive()) return;
     try {
       const db = await getDb();
       const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");

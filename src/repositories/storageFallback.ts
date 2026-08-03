@@ -10,6 +10,7 @@ export function isStorageFallbackActive(): boolean {
 export function activateStorageFallback(): void {
   if (fallbackActive) return;
   fallbackActive = true;
+  console.warn("[storageFallback] IndexedDB 사용 불가 — localStorage로 폴백합니다.");
   listeners.forEach((listener) => listener());
 }
 
@@ -45,4 +46,22 @@ export function removeLocalStorageRecord(key: string, id: string): void {
   const record = readLocalStorage<Record<string, unknown>>(key, {});
   delete record[id];
   writeLocalStorage(key, record);
+}
+
+export function hasLocalStorageData(key: string): boolean {
+  try {
+    return localStorage.getItem(PREFIX + key) !== null;
+  } catch {
+    return false;
+  }
+}
+
+export function readAndClearLocalStorage<T>(key: string, fallback: T): T {
+  const value = readLocalStorage(key, fallback);
+  try {
+    localStorage.removeItem(PREFIX + key);
+  } catch {
+    // no-op
+  }
+  return value;
 }
