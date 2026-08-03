@@ -6,15 +6,17 @@ import { PracticeSession } from "@/features/practice/PracticeSession";
 import { pickRandomQuestions } from "@/lib/sampling";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 const questionRepository = new JsonQuestionRepository();
+const settingsRepository = new IndexedDbSettingsRepository();
 
 type Phase =
   | { kind: "setup" }
   | { kind: "loading" }
-  | { kind: "active"; questions: Question[]; theoryMap: TheoryMap }
+  | { kind: "active"; questions: Question[]; theoryMap: TheoryMap; autoSaveWrongNotes: boolean }
   | { kind: "done"; summary: SessionSummary }
   | { kind: "error"; message: string };
 
@@ -25,11 +27,12 @@ export default function PracticePage() {
     setPhase({ kind: "loading" });
 
     try {
-      const [pool, theoryMap] = await Promise.all([
+      const [pool, theoryMap, settings] = await Promise.all([
         questionRepository.getQuestions(
           value.subject === "all" ? {} : { subject: value.subject }
         ),
         questionRepository.getTheoryMap(),
+        settingsRepository.getSettings(),
       ]);
 
       const questions = pickRandomQuestions(pool, value.count);
@@ -38,7 +41,12 @@ export default function PracticePage() {
         return;
       }
 
-      setPhase({ kind: "active", questions, theoryMap });
+      setPhase({
+        kind: "active",
+        questions,
+        theoryMap,
+        autoSaveWrongNotes: settings.autoSaveWrongNotes,
+      });
     } catch {
       setPhase({ kind: "error", message: "문제를 불러오지 못했다. 다시 시도해달라." });
     }
@@ -90,6 +98,7 @@ export default function PracticePage() {
     <PracticeSession
       questions={phase.questions}
       theoryMap={phase.theoryMap}
+      autoSaveWrongNotes={phase.autoSaveWrongNotes}
       onFinish={(summary) => setPhase({ kind: "done", summary })}
     />
   );

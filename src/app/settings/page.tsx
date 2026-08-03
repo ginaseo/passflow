@@ -76,6 +76,9 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+        <p className="text-xs text-gray-400">
+          ※ 값만 저장됨 — 시험모드 화면이 추가되면 자동 적용된다.
+        </p>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -92,6 +95,9 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+        <p className="text-xs text-gray-400">
+          ※ 값만 저장됨 — 시험모드 화면이 추가되면 자동 적용된다.
+        </p>
       </div>
 
       <div className="flex flex-col gap-2">

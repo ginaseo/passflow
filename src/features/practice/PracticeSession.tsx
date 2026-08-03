@@ -6,25 +6,28 @@ import { gradeAnswer } from "@/lib/grading";
 import { resolveTheoryLink } from "@/lib/theory";
 import { summarizeSession, type SessionSummary } from "@/lib/summary";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
-import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 interface PracticeSessionProps {
   questions: Question[];
   theoryMap: TheoryMap;
+  autoSaveWrongNotes: boolean;
   onFinish: (summary: SessionSummary) => void;
 }
 
 const progressRepository = new IndexedDbProgressRepository();
-const settingsRepository = new IndexedDbSettingsRepository();
 
-export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSessionProps) {
+export function PracticeSession({
+  questions,
+  theoryMap,
+  autoSaveWrongNotes,
+  onFinish,
+}: PracticeSessionProps) {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [favorited, setFavorited] = useState<Record<number, boolean>>({});
   const [questionStartedAt, setQuestionStartedAt] = useState(() => Date.now());
-  const [autoSaveWrongNotes, setAutoSaveWrongNotes] = useState(true);
 
   const question = questions[current];
   const selectedAnswer = answers[current] ?? null;
@@ -32,13 +35,6 @@ export function PracticeSession({ questions, theoryMap, onFinish }: PracticeSess
     () => resolveTheoryLink(question, theoryMap),
     [question, theoryMap]
   );
-
-  useEffect(() => {
-    settingsRepository.getSettings().then(
-      (settings) => setAutoSaveWrongNotes(settings.autoSaveWrongNotes),
-      (err) => console.error("getSettings failed:", err)
-    );
-  }, []);
 
   function goTo(nextIndex: number) {
     if (nextIndex < 0 || nextIndex >= questions.length) return;
