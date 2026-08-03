@@ -1,6 +1,17 @@
 import { getDb } from "./db";
 import { isSameLocalDay } from "@/lib/timer";
 import type { Attempt, DashboardSummary, Favorite, QuestionStats, WrongNote } from "@/types/progress";
+import {
+  activateStorageFallback,
+  isStorageFallbackActive,
+  readLocalStorage,
+  removeLocalStorageRecord,
+  upsertLocalStorageRecord,
+  writeLocalStorage,
+} from "./storageFallback";
+
+const WRONG_NOTES_KEY = "wrongnotes_fallback";
+const FAVORITES_KEY = "favorites_fallback";
 
 export interface ProgressRepository {
   recordAttempt(attempt: Omit<Attempt, "id">): Promise<void>;
@@ -18,49 +29,60 @@ export interface ProgressRepository {
 
 export class IndexedDbProgressRepository implements ProgressRepository {
   async recordAttempt(attempt: Omit<Attempt, "id">): Promise<void> {
-    const db = await getDb();
-    const tx = db.transaction(["attempts", "questionStats"], "readwrite");
+    if (isStorageFallbackActive()) return;
+    try {
+      const db = await getDb();
+      const tx = db.transaction(["attempts", "questionStats"], "readwrite");
 
-    await tx.objectStore("attempts").add(attempt as Attempt);
+      await tx.objectStore("attempts").add(attempt as Attempt);
 
-    const statsStore = tx.objectStore("questionStats");
-    const existing = await statsStore.get(attempt.questionId);
-    const next: QuestionStats = existing ?? {
-      questionId: attempt.questionId,
-      correctCount: 0,
-      wrongCount: 0,
-      lastSolvedAt: 0,
-    };
-    if (attempt.isCorrect) {
-      next.correctCount += 1;
-    } else {
-      next.wrongCount += 1;
-    }
-    next.lastSolvedAt = attempt.solvedAt;
-    await statsStore.put(next);
-
-    await tx.done;
-  }
-
-  async getAttempts(questionId?: string): Promise<Attempt[]> {
-    const db = await getDb();
-    if (questionId) {
-      return db.getAllFromIndex("attempts", "questionId", questionId);
-    }
-    return db.getAll("attempts");
-  }
-
-  async getQuestionStats(questionId: string): Promise<QuestionStats> {
-    const db = await getDb();
-    const existing = await db.get("questionStats", questionId);
-    return (
-      existing ?? {
-        questionId,
+      const statsStore = tx.objectStore("questionStats");
+      const existing = await statsStore.get(attempt.questionId);
+      const next: QuestionStats = existing ?? {
+        questionId: attempt.questionId,
         correctCount: 0,
         wrongCount: 0,
         lastSolvedAt: 0,
+      };
+      if (attempt.isCorrect) {
+        next.correctCount += 1;
+      } else {
+        next.wrongCount += 1;
       }
-    );
+      next.lastSolvedAt = attempt.solvedAt;
+      await statsStore.put(next);
+
+      await tx.done;
+    } catch {
+      activateStorageFallback();
+    }
+  }
+
+  async getAttempts(questionId?: string): Promise<Attempt[]> {
+    if (isStorageFallbackActive()) return [];
+    try {
+      const db = await getDb();
+      if (questionId) {
+        return db.getAllFromIndex("attempts", "questionId", questionId);
+      }
+      return db.getAll("attempts");
+    } catch {
+      activateStorageFallback();
+      return [];
+    }
+  }
+
+  async getQuestionStats(questionId: string): Promise<QuestionStats> {
+    const empty: QuestionStats = { questionId, correctCount: 0, wrongCount: 0, lastSolvedAt: 0 };
+    if (isStorageFallbackActive()) return empty;
+    try {
+      const db = await getDb();
+      const existing = await db.get("questionStats", questionId);
+      return existing ?? empty;
+    } catch {
+      activateStorageFallback();
+      return empty;
+    }
   }
 
   async getDashboardSummary(): Promise<DashboardSummary> {
@@ -80,44 +102,105 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   }
 
   async addWrongNote(questionId: string): Promise<void> {
-    const db = await getDb();
-    await db.put("wrongNotes", { questionId, addedAt: Date.now() });
+    const note: WrongNote = { questionId, addedAt: Date.now() };
+    if (isStorageFallbackActive()) {
+      upsertLocalStorageRecord(WRONG_NOTES_KEY, questionId, note);
+      return;
+    }
+    try {
+      const db = await getDb();
+      await db.put("wrongNotes", note);
+    } catch {
+      activateStorageFallback();
+      upsertLocalStorageRecord(WRONG_NOTES_KEY, questionId, note);
+    }
   }
 
   async addFavorite(questionId: string): Promise<void> {
-    const db = await getDb();
-    await db.put("favorites", { questionId, addedAt: Date.now() });
+    const favorite: Favorite = { questionId, addedAt: Date.now() };
+    if (isStorageFallbackActive()) {
+      upsertLocalStorageRecord(FAVORITES_KEY, questionId, favorite);
+      return;
+    }
+    try {
+      const db = await getDb();
+      await db.put("favorites", favorite);
+    } catch {
+      activateStorageFallback();
+      upsertLocalStorageRecord(FAVORITES_KEY, questionId, favorite);
+    }
   }
 
   async getWrongNotes(): Promise<WrongNote[]> {
-    const db = await getDb();
-    return db.getAll("wrongNotes");
+    if (isStorageFallbackActive()) {
+      return Object.values(readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {}));
+    }
+    try {
+      const db = await getDb();
+      return db.getAll("wrongNotes");
+    } catch {
+      activateStorageFallback();
+      return Object.values(readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {}));
+    }
   }
 
   async getFavorites(): Promise<Favorite[]> {
-    const db = await getDb();
-    return db.getAll("favorites");
+    if (isStorageFallbackActive()) {
+      return Object.values(readLocalStorage<Record<string, Favorite>>(FAVORITES_KEY, {}));
+    }
+    try {
+      const db = await getDb();
+      return db.getAll("favorites");
+    } catch {
+      activateStorageFallback();
+      return Object.values(readLocalStorage<Record<string, Favorite>>(FAVORITES_KEY, {}));
+    }
   }
 
   async removeWrongNote(questionId: string): Promise<void> {
-    const db = await getDb();
-    await db.delete("wrongNotes", questionId);
+    if (isStorageFallbackActive()) {
+      removeLocalStorageRecord(WRONG_NOTES_KEY, questionId);
+      return;
+    }
+    try {
+      const db = await getDb();
+      await db.delete("wrongNotes", questionId);
+    } catch {
+      activateStorageFallback();
+      removeLocalStorageRecord(WRONG_NOTES_KEY, questionId);
+    }
   }
 
   async removeFavorite(questionId: string): Promise<void> {
-    const db = await getDb();
-    await db.delete("favorites", questionId);
+    if (isStorageFallbackActive()) {
+      removeLocalStorageRecord(FAVORITES_KEY, questionId);
+      return;
+    }
+    try {
+      const db = await getDb();
+      await db.delete("favorites", questionId);
+    } catch {
+      activateStorageFallback();
+      removeLocalStorageRecord(FAVORITES_KEY, questionId);
+    }
   }
 
   async resetAll(): Promise<void> {
-    const db = await getDb();
-    const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
-    await Promise.all([
-      tx.objectStore("attempts").clear(),
-      tx.objectStore("questionStats").clear(),
-      tx.objectStore("wrongNotes").clear(),
-      tx.objectStore("favorites").clear(),
-    ]);
-    await tx.done;
+    writeLocalStorage(WRONG_NOTES_KEY, {});
+    writeLocalStorage(FAVORITES_KEY, {});
+    if (isStorageFallbackActive()) return;
+    try {
+      const db = await getDb();
+      const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
+      await Promise.all([
+        tx.objectStore("attempts").clear(),
+        tx.objectStore("questionStats").clear(),
+        tx.objectStore("wrongNotes").clear(),
+        tx.objectStore("favorites").clear(),
+      ]);
+      await tx.done;
+    } catch {
+      activateStorageFallback();
+    }
   }
 }
