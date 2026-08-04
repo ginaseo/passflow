@@ -62,7 +62,7 @@ export function ReviewList({ questions, emptyMessage, onRemove, onRetry, metaFor
             />
             <span
               onClick={() => toggleSelected(question.questionId)}
-              className="text-sm flex-1 cursor-pointer"
+              className="text-sm flex-1 min-w-0 cursor-pointer"
             >
               <span className="block truncate">{question.stem}</span>
               {metaFor?.(question.questionId) && (
