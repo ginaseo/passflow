@@ -105,6 +105,11 @@ export interface ProgressRepository {
   removeWrongNote(questionId: string): Promise<void>;
   removeFavorite(questionId: string): Promise<void>;
   resetAll(): Promise<void>;
+  importBackup(data: {
+    attempts: Omit<Attempt, "id">[];
+    wrongNotes: WrongNote[];
+    favorites: Favorite[];
+  }): Promise<void>;
 }
 
 export class IndexedDbProgressRepository implements ProgressRepository {
@@ -297,5 +302,55 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     } catch {
       noteFallbackTriggered();
     }
+  }
+
+  async importBackup(data: {
+    attempts: Omit<Attempt, "id">[];
+    wrongNotes: WrongNote[];
+    favorites: Favorite[];
+  }): Promise<void> {
+    const db = await getDb();
+    await reconcileIfNeeded(db);
+    const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
+
+    const attemptsStore = tx.objectStore("attempts");
+    const statsStore = tx.objectStore("questionStats");
+    const wrongNotesStore = tx.objectStore("wrongNotes");
+    const favoritesStore = tx.objectStore("favorites");
+
+    // 같은 문제를 같은 시각에 같은 세션에서 푼 기록은 동일 풀이로 취급한다 —
+    // 같은 백업 파일을 실수로(또는 확인차) 두 번 가져와도 풀이수가 배로 부풀지 않게.
+    const attemptKey = (a: { solvedAt: number; sessionId?: string }) => `${a.solvedAt}|${a.sessionId ?? ""}`;
+
+    const affectedQuestionIds = new Set(data.attempts.map((a) => a.questionId));
+    const existingKeysByQuestion = new Map<string, Set<string>>();
+    for (const questionId of affectedQuestionIds) {
+      const existing = await attemptsStore.index("questionId").getAll(questionId);
+      existingKeysByQuestion.set(questionId, new Set(existing.map(attemptKey)));
+    }
+
+    for (const attempt of data.attempts) {
+      const keys = existingKeysByQuestion.get(attempt.questionId)!;
+      const key = attemptKey(attempt);
+      if (keys.has(key)) continue;
+      keys.add(key);
+      await attemptsStore.add(attempt as Attempt);
+    }
+    for (const note of data.wrongNotes) {
+      await wrongNotesStore.put(note);
+    }
+    for (const favorite of data.favorites) {
+      await favoritesStore.put(favorite);
+    }
+
+    for (const questionId of affectedQuestionIds) {
+      const questionAttempts = await attemptsStore.index("questionId").getAll(questionId);
+      const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
+      const wrongCount = questionAttempts.length - correctCount;
+      const lastSolvedAt = questionAttempts.reduce((max, a) => Math.max(max, a.solvedAt), 0);
+      await statsStore.put({ questionId, correctCount, wrongCount, lastSolvedAt });
+    }
+
+    await tx.done;
   }
 }

@@ -215,4 +215,85 @@ describe("IndexedDbProgressRepository", () => {
     expect(await db.getAll("wrongNotes")).toEqual([]);
     expect(await db.getAll("favorites")).toEqual([]);
   });
+
+  it("importBackup은 wrongNotes/favorites를 questionId 기준으로 덮어쓰고, attempts는 추가하고, questionStats를 다시 계산한다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.addWrongNote("q1", "study"); // 기존 데이터 — 백업에도 q1이 있으면 덮어써져야 함
+    await repo.addFavorite("q9"); // 기존 데이터 — 백업에 없으니 그대로 남아야 함
+    await repo.recordAttempt({
+      questionId: "q1",
+      solvedAt: 500,
+      mode: "study",
+      selectedAnswer: 1,
+      isCorrect: true,
+      solveTimeMs: 100,
+      sessionId: "session-old",
+    });
+
+    await repo.importBackup({
+      attempts: [
+        {
+          questionId: "q1",
+          solvedAt: 1000,
+          mode: "exam",
+          selectedAnswer: 2,
+          isCorrect: false,
+          solveTimeMs: 200,
+          sessionId: "session-imported",
+        },
+      ],
+      wrongNotes: [{ questionId: "q1", addedAt: 9999, mode: "exam" }],
+      favorites: [{ questionId: "q2", addedAt: 8888 }],
+    });
+
+    const wrongNotes = await repo.getWrongNotes();
+    expect(wrongNotes.find((n) => n.questionId === "q1")).toEqual({
+      questionId: "q1",
+      addedAt: 9999,
+      mode: "exam",
+    });
+
+    const favorites = await repo.getFavorites();
+    expect(favorites.map((f) => f.questionId).sort()).toEqual(["q2", "q9"]);
+
+    const attempts = await repo.getAttempts("q1");
+    expect(attempts).toHaveLength(2); // 기존 1개 + 가져온 1개
+
+    const stats = await repo.getQuestionStats("q1");
+    expect(stats).toEqual({
+      questionId: "q1",
+      correctCount: 1, // 기존 attempt(정답)
+      wrongCount: 1, // 가져온 attempt(오답)
+      lastSolvedAt: 1000, // 더 최근 solvedAt
+    });
+  });
+
+  it("importBackup은 같은 백업을 두 번 가져와도 attempts를 중복 저장하지 않는다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    const backup = {
+      attempts: [
+        {
+          questionId: "q1",
+          solvedAt: 1000,
+          mode: "study" as const,
+          selectedAnswer: 1,
+          isCorrect: true,
+          solveTimeMs: 100,
+          sessionId: "session-a",
+        },
+      ],
+      wrongNotes: [],
+      favorites: [],
+    };
+
+    await repo.importBackup(backup);
+    await repo.importBackup(backup); // 같은 파일을 실수로 두 번 가져온 상황
+
+    const attempts = await repo.getAttempts("q1");
+    expect(attempts).toHaveLength(1);
+
+    const stats = await repo.getQuestionStats("q1");
+    expect(stats.correctCount).toBe(1);
+    expect(stats.wrongCount).toBe(0);
+  });
 });
