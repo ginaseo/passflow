@@ -202,7 +202,7 @@ export default function SettingsPage() {
           />
         </label>
         <p className="text-xs text-gray-400">
-          ※ 기존 데이터에 병합된다 — 같은 파일을 두 번 가져오면 풀이 기록이 중복된다.
+          ※ 기존 데이터에 병합된다. 완전히 같은 풀이 기록은 다시 가져와도 중복 저장되지 않는다.
         </p>
         {importMessage && <p className="text-sm text-gray-700">{importMessage}</p>}
 

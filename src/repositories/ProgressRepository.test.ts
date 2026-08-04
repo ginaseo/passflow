@@ -267,4 +267,33 @@ describe("IndexedDbProgressRepository", () => {
       lastSolvedAt: 1000, // 더 최근 solvedAt
     });
   });
+
+  it("importBackup은 같은 백업을 두 번 가져와도 attempts를 중복 저장하지 않는다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    const backup = {
+      attempts: [
+        {
+          questionId: "q1",
+          solvedAt: 1000,
+          mode: "study" as const,
+          selectedAnswer: 1,
+          isCorrect: true,
+          solveTimeMs: 100,
+          sessionId: "session-a",
+        },
+      ],
+      wrongNotes: [],
+      favorites: [],
+    };
+
+    await repo.importBackup(backup);
+    await repo.importBackup(backup); // 같은 파일을 실수로 두 번 가져온 상황
+
+    const attempts = await repo.getAttempts("q1");
+    expect(attempts).toHaveLength(1);
+
+    const stats = await repo.getQuestionStats("q1");
+    expect(stats.correctCount).toBe(1);
+    expect(stats.wrongCount).toBe(0);
+  });
 });
