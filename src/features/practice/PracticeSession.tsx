@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnswerGrid } from "./AnswerGrid";
 import { QuestionCard } from "./QuestionCard";
 import { gradeAnswer } from "@/lib/grading";
 import { resolveTheoryLink } from "@/lib/theory";
@@ -36,7 +37,9 @@ export function PracticeSession({
   const [questionStartedAt, setQuestionStartedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
   const [sessionStartedAt] = useState(() => Date.now());
+  const sessionId = String(sessionStartedAt);
   const finishedRef = useRef(false);
+  const [showGrid, setShowGrid] = useState(false);
 
   const question = questions[current];
   const selectedAnswer = answers[current] ?? null;
@@ -84,12 +87,13 @@ export function PracticeSession({
           selectedAnswer: answer,
           isCorrect,
           solveTimeMs: Date.now() - questionStartedAt,
+          sessionId,
         })
         .catch((err) => console.error("recordAttempt failed:", err));
 
       if (!isCorrect && autoSaveWrongNotes) {
         progressRepository
-          .addWrongNote(question.questionId)
+          .addWrongNote(question.questionId, mode)
           .catch((err) => console.error("addWrongNote failed:", err));
       }
     } else {
@@ -127,12 +131,13 @@ export function PracticeSession({
           selectedAnswer: answer,
           isCorrect,
           solveTimeMs: avgSolveTimeMs,
+          sessionId,
         })
         .catch((err) => console.error("recordAttempt failed:", err));
 
       if (!isCorrect) {
         progressRepository
-          .addWrongNote(q.questionId)
+          .addWrongNote(q.questionId, "exam")
           .catch((err) => console.error("addWrongNote failed:", err));
       }
     }
@@ -194,10 +199,30 @@ export function PracticeSession({
         ) : (
           <span />
         )}
-        <button type="button" onClick={finish} className="text-sm text-gray-500 underline">
-          그만두기
-        </button>
+        <div className="flex items-center gap-3">
+          {mode === "exam" && (
+            <button
+              type="button"
+              onClick={() => setShowGrid((prev) => !prev)}
+              className="text-sm text-gray-500 underline"
+            >
+              문항현황
+            </button>
+          )}
+          <button type="button" onClick={finish} className="text-sm text-gray-500 underline">
+            그만두기
+          </button>
+        </div>
       </div>
+      {mode === "exam" && showGrid && (
+        <AnswerGrid
+          questions={questions}
+          mode="progress"
+          answers={answers}
+          currentIndex={current}
+          onJump={goTo}
+        />
+      )}
       <QuestionCard
         question={question}
         index={current}
