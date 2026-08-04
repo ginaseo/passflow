@@ -37,7 +37,7 @@ export function PracticeSession({
   const [questionStartedAt, setQuestionStartedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
   const [sessionStartedAt] = useState(() => Date.now());
-  const sessionId = String(sessionStartedAt);
+  const [sessionId] = useState(() => `session-${crypto.randomUUID()}`);
   const finishedRef = useRef(false);
   const [showGrid, setShowGrid] = useState(false);
 

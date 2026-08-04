@@ -46,4 +46,12 @@ describe("getLastSessionQuestionIds", () => {
     ];
     expect(getLastSessionQuestionIds(attempts)).toEqual(["Q2"]);
   });
+
+  it("구버전 solvedAt 값과 우연히 같은 문자열의 sessionId가 있어도 서로 다른 세션으로 취급한다", () => {
+    const attempts = [
+      makeAttempt({ questionId: "Q1", solvedAt: 1000, sessionId: undefined }),
+      makeAttempt({ questionId: "Q2", solvedAt: 2000, sessionId: "1000" }),
+    ];
+    expect(getLastSessionQuestionIds(attempts)).toEqual(["Q2"]);
+  });
 });
