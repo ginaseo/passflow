@@ -105,6 +105,11 @@ export interface ProgressRepository {
   removeWrongNote(questionId: string): Promise<void>;
   removeFavorite(questionId: string): Promise<void>;
   resetAll(): Promise<void>;
+  importBackup(data: {
+    attempts: Omit<Attempt, "id">[];
+    wrongNotes: WrongNote[];
+    favorites: Favorite[];
+  }): Promise<void>;
 }
 
 export class IndexedDbProgressRepository implements ProgressRepository {
@@ -297,5 +302,40 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     } catch {
       noteFallbackTriggered();
     }
+  }
+
+  async importBackup(data: {
+    attempts: Omit<Attempt, "id">[];
+    wrongNotes: WrongNote[];
+    favorites: Favorite[];
+  }): Promise<void> {
+    const db = await getDb();
+    const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
+
+    const attemptsStore = tx.objectStore("attempts");
+    const statsStore = tx.objectStore("questionStats");
+    const wrongNotesStore = tx.objectStore("wrongNotes");
+    const favoritesStore = tx.objectStore("favorites");
+
+    for (const attempt of data.attempts) {
+      await attemptsStore.add(attempt as Attempt);
+    }
+    for (const note of data.wrongNotes) {
+      await wrongNotesStore.put(note);
+    }
+    for (const favorite of data.favorites) {
+      await favoritesStore.put(favorite);
+    }
+
+    const affectedQuestionIds = new Set(data.attempts.map((a) => a.questionId));
+    for (const questionId of affectedQuestionIds) {
+      const questionAttempts = await attemptsStore.index("questionId").getAll(questionId);
+      const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
+      const wrongCount = questionAttempts.length - correctCount;
+      const lastSolvedAt = questionAttempts.reduce((max, a) => Math.max(max, a.solvedAt), 0);
+      await statsStore.put({ questionId, correctCount, wrongCount, lastSolvedAt });
+    }
+
+    await tx.done;
   }
 }
