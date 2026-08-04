@@ -1,5 +1,5 @@
 import "fake-indexeddb/auto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getDb, invalidateDb } from "./db";
 
 describe("db", () => {
@@ -11,5 +11,15 @@ describe("db", () => {
     invalidateDb();
     const third = await getDb();
     expect(third).not.toBe(first);
+  });
+
+  it("invalidateDb는 기존 연결을 닫는다", async () => {
+    const first = await getDb();
+    const closeSpy = vi.spyOn(first, "close");
+
+    invalidateDb();
+    await getDb();
+
+    expect(closeSpy).toHaveBeenCalledTimes(1);
   });
 });

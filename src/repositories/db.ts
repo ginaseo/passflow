@@ -55,5 +55,9 @@ export function getDb(): Promise<IDBPDatabase<PassFlowDB>> {
 }
 
 export function invalidateDb(): void {
+  const staleDbPromise = dbPromise;
   dbPromise = null;
+  if (staleDbPromise) {
+    void staleDbPromise.then((db) => db.close()).catch(() => undefined);
+  }
 }
