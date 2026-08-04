@@ -86,4 +86,30 @@ describe("parseBackup", () => {
     });
     expect(parseBackup(json)).toBeNull();
   });
+
+  it("settings 필드가 빈 객체면 null을 반환한다", () => {
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: {},
+    });
+    expect(parseBackup(json)).toBeNull();
+  });
+
+  it("settings의 enum 필드 값이 유효하지 않으면 null을 반환한다", () => {
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: { autoSaveWrongNotes: true, defaultMode: "not-a-mode", timeoutBehavior: "wrong" },
+    });
+    expect(parseBackup(json)).toBeNull();
+  });
 });

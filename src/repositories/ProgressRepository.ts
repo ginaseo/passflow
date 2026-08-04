@@ -310,6 +310,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     favorites: Favorite[];
   }): Promise<void> {
     const db = await getDb();
+    await reconcileIfNeeded(db);
     const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
 
     const attemptsStore = tx.objectStore("attempts");

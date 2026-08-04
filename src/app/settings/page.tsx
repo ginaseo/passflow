@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { parseBackup, serializeBackup } from "@/lib/backup";
+import { isStorageFallbackActive } from "@/repositories/storageFallback";
 import { DEFAULT_SETTINGS, type Settings, type TimeoutBehavior } from "@/types/settings";
 import type { Mode } from "@/types/progress";
 
@@ -21,6 +22,7 @@ export default function SettingsPage() {
   const [resetDone, setResetDone] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     settingsRepository.getSettings().then(
@@ -62,6 +64,10 @@ export default function SettingsPage() {
       const questionStats = await Promise.all(
         questionIds.map((id) => progressRepository.getQuestionStats(id))
       );
+      if (isStorageFallbackActive()) {
+        setExportError("IndexedDB에 접근할 수 없어 내보내기를 할 수 없다. 브라우저 저장소 상태를 확인한 뒤 다시 시도해달라.");
+        return;
+      }
       const json = serializeBackup({
         attempts,
         questionStats,
@@ -90,6 +96,7 @@ export default function SettingsPage() {
       setImportMessage("백업 파일 형식이 올바르지 않다.");
       return;
     }
+    setImporting(true);
     try {
       await progressRepository.importBackup({
         attempts: backup.attempts,
@@ -97,10 +104,13 @@ export default function SettingsPage() {
         favorites: backup.favorites,
       });
       await settingsRepository.updateSettings(backup.settings);
+      setSettings(backup.settings);
       setImportMessage("가져오기 완료됐다.");
     } catch (err) {
       console.error("handleImport failed:", err);
       setImportMessage("가져오기에 실패했다. 다시 시도해달라.");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -175,12 +185,15 @@ export default function SettingsPage() {
         </button>
         {exportError && <p className="text-sm text-red-700">{exportError}</p>}
 
-        <label className="self-start px-3 py-1.5 rounded border cursor-pointer">
+        <label
+          className={`self-start px-3 py-1.5 rounded border ${importing ? "opacity-50" : "cursor-pointer"}`}
+        >
           백업 가져오기
           <input
             type="file"
             accept="application/json"
             className="hidden"
+            disabled={importing}
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) handleImport(file);
@@ -188,6 +201,9 @@ export default function SettingsPage() {
             }}
           />
         </label>
+        <p className="text-xs text-gray-400">
+          ※ 기존 데이터에 병합된다 — 같은 파일을 두 번 가져오면 풀이 기록이 중복된다.
+        </p>
         {importMessage && <p className="text-sm text-gray-700">{importMessage}</p>}
 
         <button

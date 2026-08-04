@@ -40,6 +40,16 @@ export function serializeBackup(data: {
   return JSON.stringify(backup, null, 2);
 }
 
+function isValidSettings(value: unknown): value is Settings {
+  if (typeof value !== "object" || value === null) return false;
+  const s = value as Record<string, unknown>;
+  return (
+    typeof s.autoSaveWrongNotes === "boolean" &&
+    (s.defaultMode === "study" || s.defaultMode === "exam") &&
+    (s.timeoutBehavior === "wrong" || s.timeoutBehavior === "warn" || s.timeoutBehavior === "ignore")
+  );
+}
+
 export function parseBackup(text: string): Backup | null {
   let raw: unknown;
   try {
@@ -57,8 +67,7 @@ export function parseBackup(text: string): Backup | null {
     !Array.isArray(obj.questionStats) ||
     !Array.isArray(obj.wrongNotes) ||
     !Array.isArray(obj.favorites) ||
-    typeof obj.settings !== "object" ||
-    obj.settings === null
+    !isValidSettings(obj.settings)
   ) {
     return null;
   }
