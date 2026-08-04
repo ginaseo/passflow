@@ -24,6 +24,8 @@ export function AnswerGrid({ questions, mode, answers, currentIndex, onJump }: A
           style = answered
             ? "border-blue-600 bg-blue-50 text-blue-700"
             : "border-gray-300 text-gray-400";
+        } else if (!answered) {
+          style = "border-gray-300 bg-gray-50 text-gray-400";
         } else {
           style = isCorrect
             ? "border-green-600 bg-green-50 text-green-700"

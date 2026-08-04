@@ -240,8 +240,8 @@ export default function ReviewPage() {
                   const note = wrongNotesById.get(id);
                   if (!note) return null;
                   const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
-                  const modeLabel = note.mode === "exam" ? "시험모드" : "학습모드";
-                  return `${date} · ${modeLabel}`;
+                  const modeLabel = note.mode === "exam" ? "시험모드" : note.mode === "study" ? "학습모드" : null;
+                  return modeLabel ? `${date} · ${modeLabel}` : date;
                 }
               : undefined
           }

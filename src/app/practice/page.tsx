@@ -163,7 +163,7 @@ export default function PracticePage() {
             onClick={() => retryWrong(wrongQuestions)}
             className="px-4 py-2 rounded border font-medium"
           >
-            틀린 문제만 다시풀기 ({wrongQuestions.length}문제)
+            틀린·안 푼 문제 다시풀기 ({wrongQuestions.length}문제)
           </button>
         )}
         <button
