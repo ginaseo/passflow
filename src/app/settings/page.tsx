@@ -90,14 +90,14 @@ export default function SettingsPage() {
 
   async function handleImport(file: File) {
     setImportMessage(null);
-    const text = await file.text();
-    const backup = parseBackup(text);
-    if (!backup) {
-      setImportMessage("백업 파일 형식이 올바르지 않다.");
-      return;
-    }
     setImporting(true);
     try {
+      const text = await file.text();
+      const backup = parseBackup(text);
+      if (!backup) {
+        setImportMessage("백업 파일 형식이 올바르지 않다.");
+        return;
+      }
       await progressRepository.importBackup({
         attempts: backup.attempts,
         wrongNotes: backup.wrongNotes,
