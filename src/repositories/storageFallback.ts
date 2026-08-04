@@ -56,12 +56,10 @@ export function hasLocalStorageData(key: string): boolean {
   }
 }
 
-export function readAndClearLocalStorage<T>(key: string, fallback: T): T {
-  const value = readLocalStorage(key, fallback);
+export function clearLocalStorage(key: string): void {
   try {
     localStorage.removeItem(PREFIX + key);
   } catch {
     // no-op
   }
-  return value;
 }

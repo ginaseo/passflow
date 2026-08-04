@@ -3,9 +3,9 @@ import { isSameLocalDay } from "@/lib/timer";
 import type { Attempt, DashboardSummary, Favorite, QuestionStats, WrongNote } from "@/types/progress";
 import {
   activateStorageFallback,
+  clearLocalStorage,
   hasLocalStorageData,
   isStorageFallbackActive,
-  readAndClearLocalStorage,
   readLocalStorage,
   removeLocalStorageRecord,
   upsertLocalStorageRecord,
@@ -21,16 +21,18 @@ async function reconcileIfNeeded(db: Awaited<ReturnType<typeof getDb>>): Promise
   if (progressReconciled) return;
   progressReconciled = true;
   if (hasLocalStorageData(WRONG_NOTES_KEY)) {
-    const notes = readAndClearLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {});
+    const notes = readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {});
     const tx = db.transaction("wrongNotes", "readwrite");
     await Promise.all(Object.values(notes).map((note) => tx.store.put(note)));
     await tx.done;
+    clearLocalStorage(WRONG_NOTES_KEY);
   }
   if (hasLocalStorageData(FAVORITES_KEY)) {
-    const favorites = readAndClearLocalStorage<Record<string, Favorite>>(FAVORITES_KEY, {});
+    const favorites = readLocalStorage<Record<string, Favorite>>(FAVORITES_KEY, {});
     const tx = db.transaction("favorites", "readwrite");
     await Promise.all(Object.values(favorites).map((favorite) => tx.store.put(favorite)));
     await tx.done;
+    clearLocalStorage(FAVORITES_KEY);
   }
 }
 

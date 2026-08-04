@@ -2,9 +2,9 @@ import { getDb } from "./db";
 import { DEFAULT_SETTINGS, type Settings } from "@/types/settings";
 import {
   activateStorageFallback,
+  clearLocalStorage,
   hasLocalStorageData,
   isStorageFallbackActive,
-  readAndClearLocalStorage,
   readLocalStorage,
   writeLocalStorage,
 } from "./storageFallback";
@@ -18,8 +18,9 @@ async function reconcileIfNeeded(db: Awaited<ReturnType<typeof getDb>>): Promise
   if (reconciled) return;
   reconciled = true;
   if (!hasLocalStorageData(SETTINGS_FALLBACK_KEY)) return;
-  const leftover = readAndClearLocalStorage(SETTINGS_FALLBACK_KEY, DEFAULT_SETTINGS);
+  const leftover = readLocalStorage(SETTINGS_FALLBACK_KEY, DEFAULT_SETTINGS);
   await db.put("settings", leftover, SETTINGS_KEY);
+  clearLocalStorage(SETTINGS_FALLBACK_KEY);
 }
 
 export interface SettingsRepository {
