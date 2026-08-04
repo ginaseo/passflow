@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ReviewList } from "@/features/review/ReviewList";
 import { PracticeSession } from "@/features/practice/PracticeSession";
-import { getLastSessionQuestionIds } from "@/lib/recentlySolved";
+import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import type { WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
@@ -62,7 +62,7 @@ async function fetchTabQuestions(
     questionIds = favorites.sort((a, b) => b.addedAt - a.addedAt).map((n) => n.questionId);
   } else {
     const attempts = await progressRepository.getAttempts();
-    questionIds = getLastSessionQuestionIds(attempts);
+    questionIds = getAllSolvedQuestionIds(attempts);
   }
 
   const questions = await hydrate(questionIds);
