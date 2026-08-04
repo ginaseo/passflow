@@ -1,13 +1,13 @@
 import { getDb } from "./db";
 import { isSameLocalDay } from "@/lib/timer";
-import type { Attempt, DashboardSummary, Favorite, QuestionStats, WrongNote } from "@/types/progress";
+import type { Attempt, DashboardSummary, Favorite, Mode, QuestionStats, WrongNote } from "@/types/progress";
 
 export interface ProgressRepository {
   recordAttempt(attempt: Omit<Attempt, "id">): Promise<void>;
   getAttempts(questionId?: string): Promise<Attempt[]>;
   getQuestionStats(questionId: string): Promise<QuestionStats>;
   getDashboardSummary(): Promise<DashboardSummary>;
-  addWrongNote(questionId: string): Promise<void>;
+  addWrongNote(questionId: string, mode: Mode): Promise<void>;
   addFavorite(questionId: string): Promise<void>;
   getWrongNotes(): Promise<WrongNote[]>;
   getFavorites(): Promise<Favorite[]>;
@@ -79,9 +79,9 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     };
   }
 
-  async addWrongNote(questionId: string): Promise<void> {
+  async addWrongNote(questionId: string, mode: Mode): Promise<void> {
     const db = await getDb();
-    await db.put("wrongNotes", { questionId, addedAt: Date.now() });
+    await db.put("wrongNotes", { questionId, addedAt: Date.now(), mode });
   }
 
   async addFavorite(questionId: string): Promise<void> {

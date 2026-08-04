@@ -8,6 +8,7 @@ export interface Attempt {
   selectedAnswer: number;
   isCorrect: boolean;
   solveTimeMs: number;
+  sessionId: string;
 }
 
 export interface QuestionStats {
@@ -27,6 +28,7 @@ export interface DashboardSummary {
 export interface WrongNote {
   questionId: string;
   addedAt: number;
+  mode: Mode;
 }
 
 export interface Favorite {

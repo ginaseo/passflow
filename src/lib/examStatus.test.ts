@@ -16,6 +16,7 @@ function attempt(questionId: string): Attempt {
     selectedAnswer: 1,
     isCorrect: true,
     solveTimeMs: 0,
+    sessionId: "session-1",
   };
 }
 
