@@ -1,6 +1,6 @@
 import { getDb, invalidateDb } from "./db";
 import { isSameLocalDay } from "@/lib/timer";
-import type { Attempt, DashboardSummary, Favorite, QuestionStats, WrongNote } from "@/types/progress";
+import type { Attempt, DashboardSummary, Favorite, Mode, QuestionStats, WrongNote } from "@/types/progress";
 import {
   activateStorageFallback,
   clearLocalStorage,
@@ -98,7 +98,7 @@ export interface ProgressRepository {
   getAttempts(questionId?: string): Promise<Attempt[]>;
   getQuestionStats(questionId: string): Promise<QuestionStats>;
   getDashboardSummary(): Promise<DashboardSummary>;
-  addWrongNote(questionId: string): Promise<void>;
+  addWrongNote(questionId: string, mode: Mode): Promise<void>;
   addFavorite(questionId: string): Promise<void>;
   getWrongNotes(): Promise<WrongNote[]>;
   getFavorites(): Promise<Favorite[]>;
@@ -200,8 +200,8 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     };
   }
 
-  async addWrongNote(questionId: string): Promise<void> {
-    const note: WrongNote = { questionId, addedAt: Date.now() };
+  async addWrongNote(questionId: string, mode: Mode): Promise<void> {
+    const note: WrongNote = { questionId, addedAt: Date.now(), mode };
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);

@@ -16,7 +16,7 @@ beforeEach(async () => {
 describe("IndexedDbProgressRepository — 폴백 중 삭제가 복구 후 IndexedDB에도 반영됨", () => {
   it("wrongnotes tombstone이 있으면 reconciliation이 해당 IndexedDB 행을 지운다", async () => {
     const db = await getDb();
-    await db.put("wrongNotes", { questionId: "q5", addedAt: 1 });
+    await db.put("wrongNotes", { questionId: "q5", addedAt: 1, mode: "study" });
     localStorage.setItem("pf_wrongnotes_tombstones", JSON.stringify({ q5: true }));
 
     const repo = new IndexedDbProgressRepository();

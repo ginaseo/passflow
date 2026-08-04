@@ -39,6 +39,7 @@ describe("IndexedDbProgressRepository", () => {
       selectedAnswer: 2,
       isCorrect: true,
       solveTimeMs: 5000,
+      sessionId: "session-1",
     });
 
     const attempts = await repo.getAttempts("2023-1-Q1");
@@ -63,9 +64,9 @@ describe("IndexedDbProgressRepository", () => {
       solveTimeMs: 1000,
     };
 
-    await repo.recordAttempt({ ...base, solvedAt: 1000, isCorrect: true });
-    await repo.recordAttempt({ ...base, solvedAt: 2000, isCorrect: false });
-    await repo.recordAttempt({ ...base, solvedAt: 3000, isCorrect: true });
+    await repo.recordAttempt({ ...base, solvedAt: 1000, isCorrect: true, sessionId: "session-1" });
+    await repo.recordAttempt({ ...base, solvedAt: 2000, isCorrect: false, sessionId: "session-1" });
+    await repo.recordAttempt({ ...base, solvedAt: 3000, isCorrect: true, sessionId: "session-1" });
 
     const stats = await repo.getQuestionStats("2023-1-Q1");
     expect(stats.correctCount).toBe(2);
@@ -86,7 +87,7 @@ describe("IndexedDbProgressRepository", () => {
 
   it("addWrongNote / addFavorite는 questionId를 저장한다", async () => {
     const repo = new IndexedDbProgressRepository();
-    await repo.addWrongNote("2023-1-Q1");
+    await repo.addWrongNote("2023-1-Q1", "study");
     await repo.addFavorite("2023-1-Q1");
 
     const db = await getDb();
@@ -96,8 +97,8 @@ describe("IndexedDbProgressRepository", () => {
 
   it("getWrongNotes / getFavorites는 추가한 항목을 전부 반환한다", async () => {
     const repo = new IndexedDbProgressRepository();
-    await repo.addWrongNote("Q1");
-    await repo.addWrongNote("Q2");
+    await repo.addWrongNote("Q1", "study");
+    await repo.addWrongNote("Q2", "study");
     await repo.addFavorite("Q3");
 
     const wrongNotes = await repo.getWrongNotes();
@@ -115,8 +116,8 @@ describe("IndexedDbProgressRepository", () => {
 
   it("removeWrongNote / removeFavorite는 해당 항목만 지운다", async () => {
     const repo = new IndexedDbProgressRepository();
-    await repo.addWrongNote("Q1");
-    await repo.addWrongNote("Q2");
+    await repo.addWrongNote("Q1", "study");
+    await repo.addWrongNote("Q2", "study");
     await repo.addFavorite("Q3");
 
     await repo.removeWrongNote("Q1");
@@ -135,8 +136,9 @@ describe("IndexedDbProgressRepository", () => {
       selectedAnswer: 1,
       isCorrect: true,
       solveTimeMs: 1000,
+      sessionId: "session-1",
     });
-    await repo.addWrongNote("Q1");
+    await repo.addWrongNote("Q1", "study");
     await repo.addFavorite("Q1");
 
     await repo.resetAll();
@@ -154,8 +156,8 @@ describe("IndexedDbProgressRepository", () => {
 
   it("같은 questionId를 두 번 addWrongNote해도 중복 저장되지 않는다 (upsert)", async () => {
     const repo = new IndexedDbProgressRepository();
-    await repo.addWrongNote("Q1");
-    await repo.addWrongNote("Q1");
+    await repo.addWrongNote("Q1", "study");
+    await repo.addWrongNote("Q1", "study");
     expect(await repo.getWrongNotes()).toHaveLength(1);
   });
 
@@ -172,6 +174,7 @@ describe("IndexedDbProgressRepository", () => {
       selectedAnswer: 1,
       isCorrect: true,
       solveTimeMs: 1000,
+      sessionId: "session-1",
     });
     await repo.recordAttempt({
       questionId: "Q2",
@@ -180,6 +183,7 @@ describe("IndexedDbProgressRepository", () => {
       selectedAnswer: 1,
       isCorrect: false,
       solveTimeMs: 1000,
+      sessionId: "session-1",
     });
     await repo.recordAttempt({
       questionId: "Q3",
@@ -188,6 +192,7 @@ describe("IndexedDbProgressRepository", () => {
       selectedAnswer: 1,
       isCorrect: true,
       solveTimeMs: 1000,
+      sessionId: "session-1",
     });
 
     const summary = await repo.getDashboardSummary();
@@ -199,7 +204,7 @@ describe("IndexedDbProgressRepository", () => {
 
   it("resetAll은 폴백 여부와 관계없이 localStorage의 오답노트/즐겨찾기도 지우고, IndexedDB도 항상 시도해서 지운다", async () => {
     const repo = new IndexedDbProgressRepository();
-    await repo.addWrongNote("q1");
+    await repo.addWrongNote("q1", "study");
     await repo.addFavorite("q2");
 
     await repo.resetAll();

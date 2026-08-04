@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ReviewList } from "@/features/review/ReviewList";
 import { PracticeSession } from "@/features/practice/PracticeSession";
-import { getRecentlySolvedQuestionIds } from "@/lib/recentlySolved";
+import { getLastSessionQuestionIds } from "@/lib/recentlySolved";
+import type { WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
@@ -45,25 +46,34 @@ async function hydrate(questionIds: string[]): Promise<Question[]> {
     .map((r) => r.value);
 }
 
-async function fetchTabQuestions(nextTab: Tab): Promise<Question[]> {
+async function fetchTabQuestions(
+  nextTab: Tab
+): Promise<{ questions: Question[]; wrongNotesById: Map<string, WrongNote> }> {
   let questionIds: string[];
+  let wrongNotesById = new Map<string, WrongNote>();
+
   if (nextTab === "wrong") {
     const notes = await progressRepository.getWrongNotes();
-    questionIds = notes.sort((a, b) => b.addedAt - a.addedAt).map((n) => n.questionId);
+    const sorted = notes.sort((a, b) => b.addedAt - a.addedAt);
+    questionIds = sorted.map((n) => n.questionId);
+    wrongNotesById = new Map(sorted.map((n) => [n.questionId, n]));
   } else if (nextTab === "favorite") {
     const favorites = await progressRepository.getFavorites();
     questionIds = favorites.sort((a, b) => b.addedAt - a.addedAt).map((n) => n.questionId);
   } else {
     const attempts = await progressRepository.getAttempts();
-    questionIds = getRecentlySolvedQuestionIds(attempts, 20);
+    questionIds = getLastSessionQuestionIds(attempts);
   }
-  return hydrate(questionIds);
+
+  const questions = await hydrate(questionIds);
+  return { questions, wrongNotesById };
 }
 
 export default function ReviewPage() {
   const [tab, setTab] = useState<Tab>("wrong");
   const [phase, setPhase] = useState<Phase>({ kind: "list" });
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [wrongNotesById, setWrongNotesById] = useState<Map<string, WrongNote>>(new Map());
   // `loadedTab` (rather than a `loading` boolean flipped via effect) lets `loading` be
   // derived during render instead of set synchronously inside useEffect, which
   // react-hooks/set-state-in-effect disallows even through an intermediate async call.
@@ -77,15 +87,17 @@ export default function ReviewPage() {
   function loadTab(nextTab: Tab) {
     const requestId = ++latestRequestId.current;
     fetchTabQuestions(nextTab).then(
-      (hydrated) => {
+      ({ questions: hydrated, wrongNotesById: notes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
+        setWrongNotesById(notes);
         setLoadedTab(nextTab);
       },
       (err) => {
         if (requestId !== latestRequestId.current) return;
         console.error("loadTab failed:", err);
         setQuestions([]);
+        setWrongNotesById(new Map());
         setLoadedTab(nextTab);
       }
     );
@@ -94,15 +106,17 @@ export default function ReviewPage() {
   useEffect(() => {
     const requestId = ++latestRequestId.current;
     fetchTabQuestions(tab).then(
-      (hydrated) => {
+      ({ questions: hydrated, wrongNotesById: notes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
+        setWrongNotesById(notes);
         setLoadedTab(tab);
       },
       (err) => {
         if (requestId !== latestRequestId.current) return;
         console.error("loadTab failed:", err);
         setQuestions([]);
+        setWrongNotesById(new Map());
         setLoadedTab(tab);
       }
     );
@@ -220,6 +234,17 @@ export default function ReviewPage() {
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
+          metaFor={
+            tab === "wrong"
+              ? (id) => {
+                  const note = wrongNotesById.get(id);
+                  if (!note) return null;
+                  const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
+                  const modeLabel = note.mode === "exam" ? "시험모드" : note.mode === "study" ? "학습모드" : null;
+                  return modeLabel ? `${date} · ${modeLabel}` : date;
+                }
+              : undefined
+          }
         />
       )}
     </div>

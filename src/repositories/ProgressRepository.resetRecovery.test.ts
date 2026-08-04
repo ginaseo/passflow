@@ -23,9 +23,10 @@ describe("IndexedDbProgressRepository — resetAll이 IndexedDB clear에 실패�
       selectedAnswer: 1,
       isCorrect: true,
       solveTimeMs: 1,
+      sessionId: "session-1",
     });
     await db.put("questionStats", { questionId: "q1", correctCount: 1, wrongCount: 0, lastSolvedAt: 1 });
-    await db.put("wrongNotes", { questionId: "q1", addedAt: 1 });
+    await db.put("wrongNotes", { questionId: "q1", addedAt: 1, mode: "study" });
     await db.put("favorites", { questionId: "q1", addedAt: 1 });
     localStorage.setItem("pf_reset_pending", "true");
 

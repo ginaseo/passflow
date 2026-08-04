@@ -8,9 +8,10 @@ interface ReviewListProps {
   emptyMessage: string;
   onRemove?: (questionId: string) => void;
   onRetry: (questions: Question[]) => void;
+  metaFor?: (questionId: string) => string | null;
 }
 
-export function ReviewList({ questions, emptyMessage, onRemove, onRetry }: ReviewListProps) {
+export function ReviewList({ questions, emptyMessage, onRemove, onRetry, metaFor }: ReviewListProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   if (questions.length === 0) {
@@ -61,9 +62,12 @@ export function ReviewList({ questions, emptyMessage, onRemove, onRetry }: Revie
             />
             <span
               onClick={() => toggleSelected(question.questionId)}
-              className="text-sm truncate flex-1 cursor-pointer"
+              className="text-sm flex-1 cursor-pointer"
             >
-              {question.stem}
+              <span className="block truncate">{question.stem}</span>
+              {metaFor?.(question.questionId) && (
+                <span className="block text-xs text-gray-400">{metaFor(question.questionId)}</span>
+              )}
             </span>
             {onRemove && (
               <button

@@ -24,7 +24,7 @@ describe("IndexedDbProgressRepository — 세션 중 IndexedDB 복구 자동 감
   it("실패하다가 복구되면 다음 호출에서 자동으로 IndexedDB를 다시 쓰고, 폴백 중 쌓인 데이터를 병합한다", async () => {
     const repo = new IndexedDbProgressRepository();
 
-    await repo.addWrongNote("q1");
+    await repo.addWrongNote("q1", "study");
     expect(isStorageFallbackActive()).toBe(true);
     expect(localStorage.getItem("pf_wrongnotes_fallback")).not.toBeNull();
 
@@ -32,7 +32,7 @@ describe("IndexedDbProgressRepository — 세션 중 IndexedDB 복구 자동 감
     const notes = await repo.getWrongNotes();
 
     expect(isStorageFallbackActive()).toBe(false);
-    expect(notes).toEqual([{ questionId: "q1", addedAt: expect.any(Number) }]);
+    expect(notes).toEqual([{ questionId: "q1", addedAt: expect.any(Number), mode: "study" }]);
     expect(localStorage.getItem("pf_wrongnotes_fallback")).toBeNull();
   });
 });

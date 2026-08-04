@@ -16,8 +16,8 @@ describe("IndexedDbProgressRepository — IndexedDB 자체가 막힌 경우", ()
   it("addWrongNote 호출 시 자동으로 폴백해 localStorage로 동작한다", async () => {
     const repo = new IndexedDbProgressRepository();
 
-    await repo.addWrongNote("q1");
+    await repo.addWrongNote("q1", "study");
 
-    expect(await repo.getWrongNotes()).toEqual([{ questionId: "q1", addedAt: expect.any(Number) }]);
+    expect(await repo.getWrongNotes()).toEqual([{ questionId: "q1", addedAt: expect.any(Number), mode: "study" }]);
   });
 });
