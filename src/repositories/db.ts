@@ -46,7 +46,18 @@ export function getDb(): Promise<IDBPDatabase<PassFlowDB>> {
           db.createObjectStore("settings");
         }
       },
+    }).catch((err) => {
+      dbPromise = null;
+      throw err;
     });
   }
   return dbPromise;
+}
+
+export function invalidateDb(): void {
+  const staleDbPromise = dbPromise;
+  dbPromise = null;
+  if (staleDbPromise) {
+    void staleDbPromise.then((db) => db.close()).catch(() => undefined);
+  }
 }

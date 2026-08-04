@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { IndexedDbProgressRepository } from "./ProgressRepository";
@@ -10,9 +11,24 @@ beforeEach(async () => {
   await db.clear("questionStats");
   await db.clear("wrongNotes");
   await db.clear("favorites");
+  localStorage.clear();
 });
 
 describe("IndexedDbProgressRepository", () => {
+  it("복구된 IndexedDB에 남은 localStorage 폴백 데이터를 병합하고 지운다", async () => {
+    localStorage.setItem("pf_wrongnotes_fallback", JSON.stringify({ q9: { questionId: "q9", addedAt: 123 } }));
+    localStorage.setItem("pf_favorites_fallback", JSON.stringify({ q8: { questionId: "q8", addedAt: 456 } }));
+    const repo = new IndexedDbProgressRepository();
+
+    const notes = await repo.getWrongNotes();
+    const favorites = await repo.getFavorites();
+
+    expect(notes).toEqual([{ questionId: "q9", addedAt: 123 }]);
+    expect(favorites).toEqual([{ questionId: "q8", addedAt: 456 }]);
+    expect(localStorage.getItem("pf_wrongnotes_fallback")).toBeNull();
+    expect(localStorage.getItem("pf_favorites_fallback")).toBeNull();
+  });
+
   it("recordAttempt는 Attempt를 저장하고 QuestionStats를 갱신한다", async () => {
     const repo = new IndexedDbProgressRepository();
 
@@ -179,5 +195,19 @@ describe("IndexedDbProgressRepository", () => {
     expect(summary.todayAccuracy).toBe(0.5);
     expect(summary.totalCount).toBe(3);
     expect(summary.totalAccuracy).toBeCloseTo(2 / 3);
+  });
+
+  it("resetAll은 폴백 여부와 관계없이 localStorage의 오답노트/즐겨찾기도 지우고, IndexedDB도 항상 시도해서 지운다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.addWrongNote("q1");
+    await repo.addFavorite("q2");
+
+    await repo.resetAll();
+
+    expect(await repo.getWrongNotes()).toEqual([]);
+    expect(await repo.getFavorites()).toEqual([]);
+    const db = await getDb();
+    expect(await db.getAll("wrongNotes")).toEqual([]);
+    expect(await db.getAll("favorites")).toEqual([]);
   });
 });
