@@ -14,12 +14,47 @@ import {
 
 const WRONG_NOTES_KEY = "wrongnotes_fallback";
 const FAVORITES_KEY = "favorites_fallback";
+const WRONG_NOTES_TOMBSTONES_KEY = "wrongnotes_tombstones";
+const FAVORITES_TOMBSTONES_KEY = "favorites_tombstones";
+const RESET_PENDING_KEY = "reset_pending";
 
-let progressReconciled = false;
+let reconcilePromise: Promise<void> | null = null;
 
-async function reconcileIfNeeded(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
-  if (progressReconciled) return;
-  progressReconciled = true;
+function reconcileIfNeeded(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  if (!reconcilePromise) {
+    reconcilePromise = doReconcile(db);
+  }
+  return reconcilePromise;
+}
+
+async function doReconcile(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  if (readLocalStorage(RESET_PENDING_KEY, false)) {
+    const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
+    await Promise.all([
+      tx.objectStore("attempts").clear(),
+      tx.objectStore("questionStats").clear(),
+      tx.objectStore("wrongNotes").clear(),
+      tx.objectStore("favorites").clear(),
+    ]);
+    await tx.done;
+    clearLocalStorage(RESET_PENDING_KEY);
+  }
+
+  if (hasLocalStorageData(WRONG_NOTES_TOMBSTONES_KEY)) {
+    const tombstoned = readLocalStorage<Record<string, true>>(WRONG_NOTES_TOMBSTONES_KEY, {});
+    const tx = db.transaction("wrongNotes", "readwrite");
+    await Promise.all(Object.keys(tombstoned).map((id) => tx.store.delete(id)));
+    await tx.done;
+    clearLocalStorage(WRONG_NOTES_TOMBSTONES_KEY);
+  }
+  if (hasLocalStorageData(FAVORITES_TOMBSTONES_KEY)) {
+    const tombstoned = readLocalStorage<Record<string, true>>(FAVORITES_TOMBSTONES_KEY, {});
+    const tx = db.transaction("favorites", "readwrite");
+    await Promise.all(Object.keys(tombstoned).map((id) => tx.store.delete(id)));
+    await tx.done;
+    clearLocalStorage(FAVORITES_TOMBSTONES_KEY);
+  }
+
   if (hasLocalStorageData(WRONG_NOTES_KEY)) {
     const notes = readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {});
     const tx = db.transaction("wrongNotes", "readwrite");
@@ -56,6 +91,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     let db;
     try {
       db = await getDb();
+      await reconcileIfNeeded(db);
     } catch {
       activateStorageFallback();
       return;
@@ -92,6 +128,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     let db;
     try {
       db = await getDb();
+      await reconcileIfNeeded(db);
     } catch {
       activateStorageFallback();
       return [];
@@ -112,6 +149,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     let db;
     try {
       db = await getDb();
+      await reconcileIfNeeded(db);
     } catch {
       activateStorageFallback();
       return empty;
@@ -203,6 +241,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   async removeWrongNote(questionId: string): Promise<void> {
     if (isStorageFallbackActive()) {
       removeLocalStorageRecord(WRONG_NOTES_KEY, questionId);
+      upsertLocalStorageRecord(WRONG_NOTES_TOMBSTONES_KEY, questionId, true);
       return;
     }
     try {
@@ -211,12 +250,14 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     } catch {
       activateStorageFallback();
       removeLocalStorageRecord(WRONG_NOTES_KEY, questionId);
+      upsertLocalStorageRecord(WRONG_NOTES_TOMBSTONES_KEY, questionId, true);
     }
   }
 
   async removeFavorite(questionId: string): Promise<void> {
     if (isStorageFallbackActive()) {
       removeLocalStorageRecord(FAVORITES_KEY, questionId);
+      upsertLocalStorageRecord(FAVORITES_TOMBSTONES_KEY, questionId, true);
       return;
     }
     try {
@@ -225,12 +266,16 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     } catch {
       activateStorageFallback();
       removeLocalStorageRecord(FAVORITES_KEY, questionId);
+      upsertLocalStorageRecord(FAVORITES_TOMBSTONES_KEY, questionId, true);
     }
   }
 
   async resetAll(): Promise<void> {
     writeLocalStorage(WRONG_NOTES_KEY, {});
     writeLocalStorage(FAVORITES_KEY, {});
+    writeLocalStorage(WRONG_NOTES_TOMBSTONES_KEY, {});
+    writeLocalStorage(FAVORITES_TOMBSTONES_KEY, {});
+    writeLocalStorage(RESET_PENDING_KEY, true);
     try {
       const db = await getDb();
       const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
@@ -241,6 +286,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
         tx.objectStore("favorites").clear(),
       ]);
       await tx.done;
+      clearLocalStorage(RESET_PENDING_KEY);
     } catch {
       activateStorageFallback();
     }

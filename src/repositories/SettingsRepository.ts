@@ -12,11 +12,16 @@ import {
 const SETTINGS_KEY = "app";
 const SETTINGS_FALLBACK_KEY = "settings_fallback";
 
-let reconciled = false;
+let reconcilePromise: Promise<void> | null = null;
 
-async function reconcileIfNeeded(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
-  if (reconciled) return;
-  reconciled = true;
+function reconcileIfNeeded(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  if (!reconcilePromise) {
+    reconcilePromise = doReconcile(db);
+  }
+  return reconcilePromise;
+}
+
+async function doReconcile(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
   if (!hasLocalStorageData(SETTINGS_FALLBACK_KEY)) return;
   const leftover = readLocalStorage(SETTINGS_FALLBACK_KEY, DEFAULT_SETTINGS);
   await db.put("settings", leftover, SETTINGS_KEY);
