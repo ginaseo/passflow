@@ -8,6 +8,7 @@ vi.mock("./db", () => ({
         throw new Error("simulated write failure");
       },
     }),
+  invalidateDb: () => {},
 }));
 
 import { IndexedDbProgressRepository } from "./ProgressRepository";

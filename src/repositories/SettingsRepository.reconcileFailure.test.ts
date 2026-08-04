@@ -6,6 +6,7 @@ vi.mock("./db", () => ({
     Promise.resolve({
       put: () => Promise.reject(new Error("simulated write failure")),
     }),
+  invalidateDb: () => {},
 }));
 
 import { IndexedDbSettingsRepository } from "./SettingsRepository";

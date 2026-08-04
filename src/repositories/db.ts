@@ -53,3 +53,7 @@ export function getDb(): Promise<IDBPDatabase<PassFlowDB>> {
   }
   return dbPromise;
 }
+
+export function invalidateDb(): void {
+  dbPromise = null;
+}

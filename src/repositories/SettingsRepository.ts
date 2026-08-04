@@ -1,4 +1,4 @@
-import { getDb } from "./db";
+import { getDb, invalidateDb } from "./db";
 import { DEFAULT_SETTINGS, type Settings } from "@/types/settings";
 import {
   activateStorageFallback,
@@ -31,6 +31,13 @@ async function doReconcile(db: Awaited<ReturnType<typeof getDb>>): Promise<void>
 function noteFallbackTriggered(): void {
   activateStorageFallback();
   reconcilePromise = null;
+  invalidateDb();
+}
+
+function deactivateIfFullyRecovered(): void {
+  if (!hasLocalStorageData(SETTINGS_FALLBACK_KEY)) {
+    deactivateStorageFallback();
+  }
 }
 
 export interface SettingsRepository {
@@ -43,7 +50,7 @@ export class IndexedDbSettingsRepository implements SettingsRepository {
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
       const existing = await db.get("settings", SETTINGS_KEY);
       return existing ?? DEFAULT_SETTINGS;
     } catch {
@@ -56,7 +63,7 @@ export class IndexedDbSettingsRepository implements SettingsRepository {
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
       await db.put("settings", settings, SETTINGS_KEY);
     } catch {
       noteFallbackTriggered();

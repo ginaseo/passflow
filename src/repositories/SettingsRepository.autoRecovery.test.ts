@@ -8,6 +8,7 @@ vi.mock("./db", async () => {
   const actual = await vi.importActual<typeof import("./db")>("./db");
   return {
     getDb: () => (shouldFail ? Promise.reject(new Error("simulated IndexedDB unavailable")) : actual.getDb()),
+    invalidateDb: actual.invalidateDb,
   };
 });
 

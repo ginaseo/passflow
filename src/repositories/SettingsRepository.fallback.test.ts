@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./db", () => ({
   getDb: () => Promise.reject(new Error("IndexedDB unavailable")),
+  invalidateDb: () => {},
 }));
 
 import { IndexedDbSettingsRepository } from "./SettingsRepository";

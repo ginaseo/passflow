@@ -8,6 +8,7 @@ vi.mock("./db", () => ({
         throw new Error("simulated quota exceeded");
       },
     }),
+  invalidateDb: () => {},
 }));
 
 import { IndexedDbProgressRepository } from "./ProgressRepository";

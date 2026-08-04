@@ -1,4 +1,4 @@
-import { getDb } from "./db";
+import { getDb, invalidateDb } from "./db";
 import { isSameLocalDay } from "@/lib/timer";
 import type { Attempt, DashboardSummary, Favorite, QuestionStats, WrongNote } from "@/types/progress";
 import {
@@ -74,6 +74,23 @@ async function doReconcile(db: Awaited<ReturnType<typeof getDb>>): Promise<void>
 function noteFallbackTriggered(): void {
   activateStorageFallback();
   reconcilePromise = null;
+  invalidateDb();
+}
+
+function hasPendingFallbackData(): boolean {
+  return (
+    hasLocalStorageData(WRONG_NOTES_KEY) ||
+    hasLocalStorageData(FAVORITES_KEY) ||
+    hasLocalStorageData(WRONG_NOTES_TOMBSTONES_KEY) ||
+    hasLocalStorageData(FAVORITES_TOMBSTONES_KEY) ||
+    readLocalStorage(RESET_PENDING_KEY, false)
+  );
+}
+
+function deactivateIfFullyRecovered(): void {
+  if (!hasPendingFallbackData()) {
+    deactivateStorageFallback();
+  }
 }
 
 export interface ProgressRepository {
@@ -96,7 +113,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
     } catch {
       noteFallbackTriggered();
       return;
@@ -133,7 +150,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
     } catch {
       noteFallbackTriggered();
       return [];
@@ -154,7 +171,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
     } catch {
       noteFallbackTriggered();
       return empty;
@@ -188,7 +205,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
       await db.put("wrongNotes", note);
     } catch {
       noteFallbackTriggered();
@@ -201,7 +218,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
       await db.put("favorites", favorite);
     } catch {
       noteFallbackTriggered();
@@ -213,7 +230,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
       return await db.getAll("wrongNotes");
     } catch {
       noteFallbackTriggered();
@@ -225,7 +242,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
       return await db.getAll("favorites");
     } catch {
       noteFallbackTriggered();
@@ -237,7 +254,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
       await db.delete("wrongNotes", questionId);
     } catch {
       noteFallbackTriggered();
@@ -250,7 +267,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
       await db.delete("favorites", questionId);
     } catch {
       noteFallbackTriggered();
@@ -276,7 +293,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       ]);
       await tx.done;
       clearLocalStorage(RESET_PENDING_KEY);
-      deactivateStorageFallback();
+      deactivateIfFullyRecovered();
     } catch {
       noteFallbackTriggered();
     }
