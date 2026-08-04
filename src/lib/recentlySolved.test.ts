@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getRecentlySolvedQuestionIds } from "./recentlySolved";
+import { getLastSessionQuestionIds } from "./recentlySolved";
 import type { Attempt } from "@/types/progress";
 
 function makeAttempt(overrides: Partial<Attempt>): Attempt {
@@ -10,39 +10,40 @@ function makeAttempt(overrides: Partial<Attempt>): Attempt {
     selectedAnswer: 1,
     isCorrect: true,
     solveTimeMs: 1000,
+    sessionId: "session-1",
     ...overrides,
   };
 }
 
-describe("getRecentlySolvedQuestionIds", () => {
+describe("getLastSessionQuestionIds", () => {
   it("빈 배열이면 빈 배열을 반환한다", () => {
-    expect(getRecentlySolvedQuestionIds([], 10)).toEqual([]);
+    expect(getLastSessionQuestionIds([])).toEqual([]);
   });
 
-  it("최근 푼 순서(내림차순)로 questionId를 반환한다", () => {
+  it("가장 최근 세션의 문항만, 푼 순서대로 반환한다", () => {
     const attempts = [
-      makeAttempt({ questionId: "Q1", solvedAt: 1000 }),
-      makeAttempt({ questionId: "Q2", solvedAt: 3000 }),
-      makeAttempt({ questionId: "Q3", solvedAt: 2000 }),
+      makeAttempt({ questionId: "Q1", solvedAt: 1000, sessionId: "session-old" }),
+      makeAttempt({ questionId: "Q2", solvedAt: 2000, sessionId: "session-old" }),
+      makeAttempt({ questionId: "Q3", solvedAt: 5000, sessionId: "session-new" }),
+      makeAttempt({ questionId: "Q4", solvedAt: 6000, sessionId: "session-new" }),
     ];
-    expect(getRecentlySolvedQuestionIds(attempts, 10)).toEqual(["Q2", "Q3", "Q1"]);
+    expect(getLastSessionQuestionIds(attempts)).toEqual(["Q3", "Q4"]);
   });
 
-  it("같은 문제를 여러 번 풀었으면 가장 최근 시각 기준으로 한 번만 나온다", () => {
+  it("같은 세션 안에서 같은 문제를 여러 번 풀었으면 한 번만 나온다", () => {
     const attempts = [
-      makeAttempt({ questionId: "Q1", solvedAt: 1000 }),
-      makeAttempt({ questionId: "Q2", solvedAt: 2000 }),
-      makeAttempt({ questionId: "Q1", solvedAt: 5000 }),
+      makeAttempt({ questionId: "Q1", solvedAt: 1000, sessionId: "session-1" }),
+      makeAttempt({ questionId: "Q2", solvedAt: 2000, sessionId: "session-1" }),
+      makeAttempt({ questionId: "Q1", solvedAt: 3000, sessionId: "session-1" }),
     ];
-    expect(getRecentlySolvedQuestionIds(attempts, 10)).toEqual(["Q1", "Q2"]);
+    expect(getLastSessionQuestionIds(attempts)).toEqual(["Q1", "Q2"]);
   });
 
-  it("limit만큼만 반환한다", () => {
+  it("sessionId가 없는 구버전 데이터는 각자 독립 세션으로 취급한다", () => {
     const attempts = [
-      makeAttempt({ questionId: "Q1", solvedAt: 1000 }),
-      makeAttempt({ questionId: "Q2", solvedAt: 2000 }),
-      makeAttempt({ questionId: "Q3", solvedAt: 3000 }),
+      makeAttempt({ questionId: "Q1", solvedAt: 1000, sessionId: undefined }),
+      makeAttempt({ questionId: "Q2", solvedAt: 2000, sessionId: undefined }),
     ];
-    expect(getRecentlySolvedQuestionIds(attempts, 2)).toEqual(["Q3", "Q2"]);
+    expect(getLastSessionQuestionIds(attempts)).toEqual(["Q2"]);
   });
 });
