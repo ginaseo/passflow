@@ -4,8 +4,8 @@ import type { Attempt, DashboardSummary, Favorite, QuestionStats, WrongNote } fr
 import {
   activateStorageFallback,
   clearLocalStorage,
+  deactivateStorageFallback,
   hasLocalStorageData,
-  isStorageFallbackActive,
   readLocalStorage,
   removeLocalStorageRecord,
   upsertLocalStorageRecord,
@@ -71,6 +71,11 @@ async function doReconcile(db: Awaited<ReturnType<typeof getDb>>): Promise<void>
   }
 }
 
+function noteFallbackTriggered(): void {
+  activateStorageFallback();
+  reconcilePromise = null;
+}
+
 export interface ProgressRepository {
   recordAttempt(attempt: Omit<Attempt, "id">): Promise<void>;
   getAttempts(questionId?: string): Promise<Attempt[]>;
@@ -87,13 +92,13 @@ export interface ProgressRepository {
 
 export class IndexedDbProgressRepository implements ProgressRepository {
   async recordAttempt(attempt: Omit<Attempt, "id">): Promise<void> {
-    if (isStorageFallbackActive()) return;
     let db;
     try {
       db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       return;
     }
     try {
@@ -124,13 +129,13 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   }
 
   async getAttempts(questionId?: string): Promise<Attempt[]> {
-    if (isStorageFallbackActive()) return [];
     let db;
     try {
       db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       return [];
     }
     try {
@@ -145,13 +150,13 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
   async getQuestionStats(questionId: string): Promise<QuestionStats> {
     const empty: QuestionStats = { questionId, correctCount: 0, wrongCount: 0, lastSolvedAt: 0 };
-    if (isStorageFallbackActive()) return empty;
     let db;
     try {
       db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       return empty;
     }
     try {
@@ -180,91 +185,75 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
   async addWrongNote(questionId: string): Promise<void> {
     const note: WrongNote = { questionId, addedAt: Date.now() };
-    if (isStorageFallbackActive()) {
-      upsertLocalStorageRecord(WRONG_NOTES_KEY, questionId, note);
-      return;
-    }
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
       await db.put("wrongNotes", note);
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       upsertLocalStorageRecord(WRONG_NOTES_KEY, questionId, note);
     }
   }
 
   async addFavorite(questionId: string): Promise<void> {
     const favorite: Favorite = { questionId, addedAt: Date.now() };
-    if (isStorageFallbackActive()) {
-      upsertLocalStorageRecord(FAVORITES_KEY, questionId, favorite);
-      return;
-    }
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
       await db.put("favorites", favorite);
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       upsertLocalStorageRecord(FAVORITES_KEY, questionId, favorite);
     }
   }
 
   async getWrongNotes(): Promise<WrongNote[]> {
-    if (isStorageFallbackActive()) {
-      return Object.values(readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {}));
-    }
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
       return await db.getAll("wrongNotes");
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       return Object.values(readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {}));
     }
   }
 
   async getFavorites(): Promise<Favorite[]> {
-    if (isStorageFallbackActive()) {
-      return Object.values(readLocalStorage<Record<string, Favorite>>(FAVORITES_KEY, {}));
-    }
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
       return await db.getAll("favorites");
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       return Object.values(readLocalStorage<Record<string, Favorite>>(FAVORITES_KEY, {}));
     }
   }
 
   async removeWrongNote(questionId: string): Promise<void> {
-    if (isStorageFallbackActive()) {
-      removeLocalStorageRecord(WRONG_NOTES_KEY, questionId);
-      upsertLocalStorageRecord(WRONG_NOTES_TOMBSTONES_KEY, questionId, true);
-      return;
-    }
     try {
       const db = await getDb();
+      await reconcileIfNeeded(db);
+      deactivateStorageFallback();
       await db.delete("wrongNotes", questionId);
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       removeLocalStorageRecord(WRONG_NOTES_KEY, questionId);
       upsertLocalStorageRecord(WRONG_NOTES_TOMBSTONES_KEY, questionId, true);
     }
   }
 
   async removeFavorite(questionId: string): Promise<void> {
-    if (isStorageFallbackActive()) {
-      removeLocalStorageRecord(FAVORITES_KEY, questionId);
-      upsertLocalStorageRecord(FAVORITES_TOMBSTONES_KEY, questionId, true);
-      return;
-    }
     try {
       const db = await getDb();
+      await reconcileIfNeeded(db);
+      deactivateStorageFallback();
       await db.delete("favorites", questionId);
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       removeLocalStorageRecord(FAVORITES_KEY, questionId);
       upsertLocalStorageRecord(FAVORITES_TOMBSTONES_KEY, questionId, true);
     }
@@ -287,8 +276,9 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       ]);
       await tx.done;
       clearLocalStorage(RESET_PENDING_KEY);
+      deactivateStorageFallback();
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
     }
   }
 }

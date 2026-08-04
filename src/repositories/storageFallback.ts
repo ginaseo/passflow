@@ -14,6 +14,12 @@ export function activateStorageFallback(): void {
   listeners.forEach((listener) => listener());
 }
 
+export function deactivateStorageFallback(): void {
+  if (!fallbackActive) return;
+  fallbackActive = false;
+  listeners.forEach((listener) => listener());
+}
+
 export function subscribeStorageFallback(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

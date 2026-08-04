@@ -3,8 +3,8 @@ import { DEFAULT_SETTINGS, type Settings } from "@/types/settings";
 import {
   activateStorageFallback,
   clearLocalStorage,
+  deactivateStorageFallback,
   hasLocalStorageData,
-  isStorageFallbackActive,
   readLocalStorage,
   writeLocalStorage,
 } from "./storageFallback";
@@ -28,6 +28,11 @@ async function doReconcile(db: Awaited<ReturnType<typeof getDb>>): Promise<void>
   clearLocalStorage(SETTINGS_FALLBACK_KEY);
 }
 
+function noteFallbackTriggered(): void {
+  activateStorageFallback();
+  reconcilePromise = null;
+}
+
 export interface SettingsRepository {
   getSettings(): Promise<Settings>;
   updateSettings(settings: Settings): Promise<void>;
@@ -35,31 +40,26 @@ export interface SettingsRepository {
 
 export class IndexedDbSettingsRepository implements SettingsRepository {
   async getSettings(): Promise<Settings> {
-    if (isStorageFallbackActive()) {
-      return readLocalStorage(SETTINGS_FALLBACK_KEY, DEFAULT_SETTINGS);
-    }
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
       const existing = await db.get("settings", SETTINGS_KEY);
       return existing ?? DEFAULT_SETTINGS;
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       return readLocalStorage(SETTINGS_FALLBACK_KEY, DEFAULT_SETTINGS);
     }
   }
 
   async updateSettings(settings: Settings): Promise<void> {
-    if (isStorageFallbackActive()) {
-      writeLocalStorage(SETTINGS_FALLBACK_KEY, settings);
-      return;
-    }
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
+      deactivateStorageFallback();
       await db.put("settings", settings, SETTINGS_KEY);
     } catch {
-      activateStorageFallback();
+      noteFallbackTriggered();
       writeLocalStorage(SETTINGS_FALLBACK_KEY, settings);
     }
   }

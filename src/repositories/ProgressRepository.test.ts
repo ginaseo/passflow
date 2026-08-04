@@ -3,7 +3,6 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { IndexedDbProgressRepository } from "./ProgressRepository";
 import { getDb } from "./db";
-import { activateStorageFallback } from "./storageFallback";
 
 beforeEach(async () => {
   // 테스트마다 DB를 비운다: fake-indexeddb는 프로세스 전역이라 이전 테스트의 데이터가 남는다.
@@ -196,46 +195,6 @@ describe("IndexedDbProgressRepository", () => {
     expect(summary.todayAccuracy).toBe(0.5);
     expect(summary.totalCount).toBe(3);
     expect(summary.totalAccuracy).toBeCloseTo(2 / 3);
-  });
-
-  it("폴백 활성 상태면 오답노트/즐겨찾기가 localStorage에 저장·조회·삭제된다", async () => {
-    activateStorageFallback();
-    const repo = new IndexedDbProgressRepository();
-
-    await repo.addWrongNote("q1");
-    await repo.addFavorite("q2");
-
-    expect(await repo.getWrongNotes()).toEqual([{ questionId: "q1", addedAt: expect.any(Number) }]);
-    expect(await repo.getFavorites()).toEqual([{ questionId: "q2", addedAt: expect.any(Number) }]);
-
-    await repo.removeWrongNote("q1");
-    expect(await repo.getWrongNotes()).toEqual([]);
-
-    // IndexedDB 쪽엔 안 쓰였는지 확인
-    const db = await getDb();
-    expect(await db.getAll("wrongNotes")).toEqual([]);
-    expect(await db.getAll("favorites")).toEqual([]);
-  });
-
-  it("폴백 활성 상태면 recordAttempt/getAttempts/getQuestionStats가 조용히 no-op한다", async () => {
-    const repo = new IndexedDbProgressRepository();
-
-    await repo.recordAttempt({
-      questionId: "q1",
-      solvedAt: 1000,
-      mode: "study",
-      selectedAnswer: 1,
-      isCorrect: true,
-      solveTimeMs: 1000,
-    });
-
-    expect(await repo.getAttempts()).toEqual([]);
-    expect(await repo.getQuestionStats("q1")).toEqual({
-      questionId: "q1",
-      correctCount: 0,
-      wrongCount: 0,
-      lastSolvedAt: 0,
-    });
   });
 
   it("resetAll은 폴백 여부와 관계없이 localStorage의 오답노트/즐겨찾기도 지우고, IndexedDB도 항상 시도해서 지운다", async () => {
