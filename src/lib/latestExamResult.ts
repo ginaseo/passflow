@@ -29,7 +29,7 @@ export function scoreExamSession(
   attempts: Attempt[],
   examId: string,
   sessionId: string
-): { correct: number; total: number; passed: boolean; subjectScores: SubjectScore[] } {
+): { correct: number; total: number; solved: number; passed: boolean; subjectScores: SubjectScore[] } {
   const byQnum = new Map<number, Attempt>();
   for (const a of attempts) {
     if (a.mode !== "exam" || a.sessionId !== sessionId) continue;
@@ -41,15 +41,19 @@ export function scoreExamSession(
 
   const bySubject = new Map<number, SubjectScore>();
   let correct = 0;
+  let solved = 0;
   const total = questions.length;
 
   for (const q of questions) {
     const subjectScore = bySubject.get(q.subject) ?? { subject: q.subject, total: 0, correct: 0 };
     subjectScore.total++;
     const a = byQnum.get(q.qnum);
-    if (a?.isCorrect) {
-      subjectScore.correct++;
-      correct++;
+    if (a) {
+      solved++;
+      if (a.isCorrect) {
+        subjectScore.correct++;
+        correct++;
+      }
     }
     bySubject.set(q.subject, subjectScore);
   }
@@ -57,5 +61,5 @@ export function scoreExamSession(
   const subjectScores = [...bySubject.values()].sort((a, b) => a.subject - b.subject);
   const passed = isPassed(subjectScores);
 
-  return { correct, total, passed, subjectScores };
+  return { correct, total, solved, passed, subjectScores };
 }
