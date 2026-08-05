@@ -64,8 +64,11 @@ function PracticeContent() {
 
   const limitParam = searchParams.get("limit");
   const limitMinutes = Number(limitParam);
+  const limitMs = limitMinutes * 60 * 1000;
   const initialTimeLimitMs: number | undefined =
-    limitParam && Number.isFinite(limitMinutes) && limitMinutes > 0 ? limitMinutes * 60 * 1000 : undefined;
+    limitParam && Number.isFinite(limitMinutes) && limitMinutes > 0 && Number.isFinite(limitMs)
+      ? limitMs
+      : undefined;
 
   // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
   // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가
