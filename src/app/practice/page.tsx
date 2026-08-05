@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/PracticeSetup";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { AnswerGrid } from "@/features/practice/AnswerGrid";
-import { pickRandomQuestions } from "@/lib/sampling";
+import { pickRandomQuestions, pickStratifiedRandomQuestions } from "@/lib/sampling";
 import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
 import { SUBJECT_NAMES } from "@/lib/theory";
@@ -42,7 +42,33 @@ function PracticeContent() {
   const resumeExamId = searchParams.get("resume");
   const [phase, setPhase] = useState<Phase>(resumeExamId ? { kind: "loading" } : { kind: "setup" });
 
-  const initialEntryType = searchParams.get("entry") === "round" ? "round" : undefined;
+  const entryParam = searchParams.get("entry");
+  const initialEntryType =
+    entryParam === "round" ? "round" : entryParam === "random" ? "random" : undefined;
+
+  const modeParam = searchParams.get("mode");
+  const initialMode: Mode | undefined = modeParam === "study" || modeParam === "exam" ? modeParam : undefined;
+
+  const subjectParam = searchParams.get("subject");
+  const subjectNum = Number(subjectParam);
+  const initialSubject: number | "all" | undefined =
+    subjectParam === "all"
+      ? "all"
+      : subjectParam && Number.isInteger(subjectNum) && subjectNum in SUBJECT_NAMES
+        ? subjectNum
+        : undefined;
+
+  const countParam = searchParams.get("count");
+  const initialCount: 20 | 40 | 100 | undefined =
+    countParam === "20" || countParam === "40" || countParam === "100" ? (Number(countParam) as 20 | 40 | 100) : undefined;
+
+  const limitParam = searchParams.get("limit");
+  const limitMinutes = Number(limitParam);
+  const limitMs = limitMinutes * 60 * 1000;
+  const initialTimeLimitMs: number | undefined =
+    limitParam && Number.isFinite(limitMinutes) && limitMinutes > 0 && Number.isFinite(limitMs)
+      ? limitMs
+      : undefined;
 
   // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
   // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가
@@ -115,7 +141,10 @@ function PracticeContent() {
         const pool = await questionRepository.getQuestions(
           value.subject === "all" ? {} : { subject: value.subject }
         );
-        questions = pickRandomQuestions(pool, value.count);
+        questions =
+          value.subject === "all"
+            ? pickStratifiedRandomQuestions(pool, value.count)
+            : pickRandomQuestions(pool, value.count);
       }
 
       const theoryMap = await theoryMapPromise;
@@ -162,7 +191,16 @@ function PracticeContent() {
   }
 
   if (phase.kind === "setup") {
-    return <PracticeSetup onStart={start} initialEntryType={initialEntryType} />;
+    return (
+      <PracticeSetup
+        onStart={start}
+        initialEntryType={initialEntryType}
+        initialMode={initialMode}
+        initialSubject={initialSubject}
+        initialCount={initialCount}
+        initialTimeLimitMs={initialTimeLimitMs}
+      />
+    );
   }
 
   if (phase.kind === "loading") {
