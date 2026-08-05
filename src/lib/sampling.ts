@@ -31,11 +31,43 @@ export function pickStratifiedRandomQuestions(
   const base = Math.floor(count / subjects.length);
   let remainder = count - base * subjects.length;
 
+  const quota = new Map<number, number>();
+  for (const subject of subjects) {
+    quota.set(subject, base + (remainder > 0 ? 1 : 0));
+    if (remainder > 0) remainder--;
+  }
+
+  // 과목 풀이 배분량보다 작으면 있는 만큼만 쓰고, 모자란 만큼은 아직 여유
+  // 있는 다른 과목들에 라운드로빈으로 다시 나눠준다 — 그래야 특정 과목이
+  // 적다고 전체 문항수가 조용히 줄어들지 않는다.
+  let shortfall = 0;
+  for (const subject of subjects) {
+    const available = bySubject.get(subject)!.length;
+    const want = quota.get(subject)!;
+    if (available < want) {
+      shortfall += want - available;
+      quota.set(subject, available);
+    }
+  }
+
+  while (shortfall > 0) {
+    let distributed = false;
+    for (const subject of subjects) {
+      if (shortfall <= 0) break;
+      const available = bySubject.get(subject)!.length;
+      const want = quota.get(subject)!;
+      if (want < available) {
+        quota.set(subject, want + 1);
+        shortfall--;
+        distributed = true;
+      }
+    }
+    if (!distributed) break; // 전체 풀이 count보다 작으면 더 나눠줄 데가 없다
+  }
+
   const picked: Question[] = [];
   for (const subject of subjects) {
-    const take = base + (remainder > 0 ? 1 : 0);
-    if (remainder > 0) remainder--;
-    picked.push(...pickRandomQuestions(bySubject.get(subject)!, take, rng));
+    picked.push(...pickRandomQuestions(bySubject.get(subject)!, quota.get(subject)!, rng));
   }
 
   return pickRandomQuestions(picked, picked.length, rng);

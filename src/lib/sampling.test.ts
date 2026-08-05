@@ -118,4 +118,21 @@ describe("pickStratifiedRandomQuestions", () => {
     const firstGroupSubjects = new Set(picked.slice(0, 20).map((q) => q.subject));
     expect(firstGroupSubjects.size).toBeGreaterThan(1);
   });
+
+  it("한 과목의 풀이 배분량보다 작아도, 부족분을 다른 과목에서 채워 전체 개수를 맞춘다", () => {
+    const pool = makeQuestionsBySubject({ 1: 5, 2: 100, 3: 100, 4: 100, 5: 100 });
+    const picked = pickStratifiedRandomQuestions(pool, 100, () => 0.5);
+    expect(picked).toHaveLength(100);
+    const bySubject = new Map<number, number>();
+    for (const q of picked) bySubject.set(q.subject, (bySubject.get(q.subject) ?? 0) + 1);
+    expect(bySubject.get(1)).toBe(5); // 과목1은 있는 만큼(5개)만
+    const redistributed = (bySubject.get(2) ?? 0) + (bySubject.get(3) ?? 0) + (bySubject.get(4) ?? 0) + (bySubject.get(5) ?? 0);
+    expect(redistributed).toBe(95); // 나머지 4과목이 부족분 15개를 나눠 가져가 95개
+  });
+
+  it("전체 풀이 count보다 작으면 있는 만큼만 반환한다(무한루프 없이)", () => {
+    const pool = makeQuestionsBySubject({ 1: 5, 2: 5, 3: 5, 4: 5, 5: 5 });
+    const picked = pickStratifiedRandomQuestions(pool, 100, () => 0.5);
+    expect(picked).toHaveLength(25);
+  });
 });
