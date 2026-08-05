@@ -112,16 +112,16 @@ export default function HomePage() {
           </Link>
         )}
         <Link
-          href="/practice"
+          href="/practice?mode=study&entry=random&subject=all&count=100"
           className="px-4 py-2 rounded border font-medium text-center"
         >
-          랜덤 시작
+          학습모드
         </Link>
         <Link
-          href="/practice?entry=round"
+          href="/practice?mode=exam&entry=round&limit=150"
           className="px-4 py-2 rounded border font-medium text-center"
         >
-          회차별 시작
+          시험모드
         </Link>
       </div>
     </div>
