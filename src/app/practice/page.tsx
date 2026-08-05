@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/PracticeSetup";
 import { PracticeSession } from "@/features/practice/PracticeSession";
@@ -46,8 +46,14 @@ function PracticeContent() {
 
   const initialEntryType = searchParams.get("entry") === "round" ? "round" : undefined;
 
+  // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
+  // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가
+  // 나중에 끝나며 최신 상태를 덮어쓰지 않게 막는다.
+  const latestResumeRequestId = useRef(0);
+
   useEffect(() => {
     if (!resumeExamId) return;
+    const requestId = ++latestResumeRequestId.current;
 
     (async () => {
       setPhase({ kind: "loading" });
@@ -58,6 +64,8 @@ function PracticeContent() {
           questionRepository.getTheoryMap(),
           settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS),
         ]);
+        if (requestId !== latestResumeRequestId.current) return;
+
         const questions = getUnansweredQuestions(pool, attempts, resumeExamId).sort(
           (a, b) => a.qnum - b.qnum
         );
@@ -77,6 +85,7 @@ function PracticeContent() {
           autoSaveWrongNotes: settings.autoSaveWrongNotes,
         });
       } catch {
+        if (requestId !== latestResumeRequestId.current) return;
         setPhase({ kind: "error", message: "이어서 풀 문항을 불러오지 못했다. 다시 시도해달라." });
       }
     })();
