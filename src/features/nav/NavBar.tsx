@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/", label: "대시보드" },
+  { href: "/", label: "홈" },
   { href: "/practice", label: "문제풀이" },
   { href: "/review", label: "복습" },
+  { href: "/dashboard", label: "대시보드" },
   { href: "/settings", label: "설정" },
 ] as const;
 
