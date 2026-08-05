@@ -26,7 +26,7 @@ export default function HomePage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [latestExam, setLatestExam] = useState<LatestExam | null>(null);
-  const [resumeExamId, setResumeExamId] = useState<string | null>(null);
+  const [resumeExam, setResumeExam] = useState<{ examId: string; title: string } | null>(null);
 
   useEffect(() => {
     progressRepository.getDashboardSummary().then(
@@ -39,7 +39,9 @@ export default function HomePage() {
 
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()])
       .then(async ([exams, attempts]) => {
-        setResumeExamId(pickResumeExamId(exams, attempts));
+        const resumeExamId = pickResumeExamId(exams, attempts);
+        const resumeExamEntry = resumeExamId ? exams.find((e) => e.examId === resumeExamId) : undefined;
+        setResumeExam(resumeExamId && resumeExamEntry ? { examId: resumeExamId, title: resumeExamEntry.title } : null);
 
         const latestExamId = pickLatestCompletedExamId(exams, attempts);
         if (!latestExamId) return;
@@ -102,12 +104,12 @@ export default function HomePage() {
       )}
 
       <div className="flex flex-col gap-2">
-        {resumeExamId && (
+        {resumeExam && (
           <Link
-            href={`/practice?resume=${resumeExamId}`}
+            href={`/practice?resume=${encodeURIComponent(resumeExam.examId)}`}
             className="px-4 py-3 rounded bg-blue-600 text-white font-medium text-center"
           >
-            이어서 풀기
+            이어서 풀기 — {resumeExam.title}
           </Link>
         )}
         <Link

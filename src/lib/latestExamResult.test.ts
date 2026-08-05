@@ -102,4 +102,15 @@ describe("scoreExamFromAttempts", () => {
     const result = scoreExamFromAttempts(questions, attempts, "2024-1");
     expect(result).toEqual({ correct: 2, total: 2, passed: true });
   });
+
+  it("exam모드로 안 푼 문항(이어서풀기로 study모드만 채운 경우)은 오답으로 처리되고 분모에 포함된다", () => {
+    const fiveQuestions = [question(1, 1), question(2, 1), question(3, 1), question(4, 1), question(5, 1)];
+    const attempts = [
+      attempt({ questionId: "2024-1-Q1", isCorrect: true, solvedAt: 100 }),
+      attempt({ questionId: "2024-1-Q2", isCorrect: true, solvedAt: 100 }),
+      // Q3~Q5: exam모드 attempt 없음 — study모드로만 이어서 풀었다고 가정, 여기선 attempt 자체를 안 만듦
+    ];
+    const result = scoreExamFromAttempts(fiveQuestions, attempts, "2024-1");
+    expect(result).toEqual({ correct: 2, total: 5, passed: false });
+  });
 });

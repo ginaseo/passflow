@@ -1,5 +1,6 @@
 import { computeExamStatuses, pickMostRecentlyTouchedExam } from "./examStatus";
 import { parseQuestionId } from "./questionId";
+import { isPassed, type SubjectScore } from "./summary";
 import type { Attempt } from "@/types/progress";
 import type { ExamSummary, Question } from "@/types/question";
 
@@ -25,29 +26,24 @@ export function scoreExamFromAttempts(
     if (!prev || a.solvedAt > prev.solvedAt) latestByQnum.set(qnum, a);
   }
 
-  const bySubject = new Map<number, { correct: number; total: number }>();
+  if (latestByQnum.size === 0) return null;
+
+  const bySubject = new Map<number, SubjectScore>();
   let correct = 0;
-  let total = 0;
+  const total = questions.length;
 
   for (const q of questions) {
-    const a = latestByQnum.get(q.qnum);
-    if (!a) continue;
-    total++;
-    const subjectScore = bySubject.get(q.subject) ?? { correct: 0, total: 0 };
+    const subjectScore = bySubject.get(q.subject) ?? { subject: q.subject, total: 0, correct: 0 };
     subjectScore.total++;
-    if (a.isCorrect) {
+    const a = latestByQnum.get(q.qnum);
+    if (a?.isCorrect) {
       subjectScore.correct++;
       correct++;
     }
     bySubject.set(q.subject, subjectScore);
   }
 
-  if (total === 0) return null;
-
-  const hasFailedSubject = [...bySubject.values()].some(
-    (s) => s.total > 0 && s.correct / s.total < 0.4
-  );
-  const passed = !hasFailedSubject && correct / total >= 0.6;
+  const passed = isPassed([...bySubject.values()]);
 
   return { correct, total, passed };
 }

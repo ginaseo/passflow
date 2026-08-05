@@ -40,10 +40,10 @@ type Phase =
   | { kind: "error"; message: string };
 
 function PracticeContent() {
-  const [phase, setPhase] = useState<Phase>({ kind: "setup" });
-
   const searchParams = useSearchParams();
   const resumeExamId = searchParams.get("resume");
+  const [phase, setPhase] = useState<Phase>(resumeExamId ? { kind: "loading" } : { kind: "setup" });
+
   const initialEntryType = searchParams.get("entry") === "round" ? "round" : undefined;
 
   useEffect(() => {
