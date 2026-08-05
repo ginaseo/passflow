@@ -17,6 +17,7 @@ interface CbtResult {
   solvedAt: number;
   correct: number;
   total: number;
+  solved: number;
   passed: boolean;
   subjectScores: SubjectScore[];
 }
@@ -133,6 +134,11 @@ export default function DashboardPage() {
                 <span className={r.passed ? "text-green-700" : "text-red-700"}>
                   {r.passed ? "합격" : "불합격"}
                 </span>
+                {r.solved < r.total && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600">
+                    미완료
+                  </span>
+                )}
               </div>
               <ul className="text-sm text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
                 {r.subjectScores.map((s) => (
