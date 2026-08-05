@@ -1,6 +1,8 @@
 import { getDb, invalidateDb } from "./db";
 import { isSameLocalDay } from "@/lib/timer";
 import type { Attempt, DashboardSummary, Favorite, Mode, QuestionStats, WrongNote } from "@/types/progress";
+import type { Settings } from "@/types/settings";
+import { SETTINGS_KEY, clearSettingsFallback } from "./SettingsRepository";
 import {
   activateStorageFallback,
   clearLocalStorage,
@@ -109,6 +111,7 @@ export interface ProgressRepository {
     attempts: Omit<Attempt, "id">[];
     wrongNotes: WrongNote[];
     favorites: Favorite[];
+    settings: Settings;
   }): Promise<void>;
 }
 
@@ -308,15 +311,20 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     attempts: Omit<Attempt, "id">[];
     wrongNotes: WrongNote[];
     favorites: Favorite[];
+    settings: Settings;
   }): Promise<void> {
     const db = await getDb();
     await reconcileIfNeeded(db);
-    const tx = db.transaction(["attempts", "questionStats", "wrongNotes", "favorites"], "readwrite");
+    const tx = db.transaction(
+      ["attempts", "questionStats", "wrongNotes", "favorites", "settings"],
+      "readwrite"
+    );
 
     const attemptsStore = tx.objectStore("attempts");
     const statsStore = tx.objectStore("questionStats");
     const wrongNotesStore = tx.objectStore("wrongNotes");
     const favoritesStore = tx.objectStore("favorites");
+    const settingsStore = tx.objectStore("settings");
 
     // 같은 문제를 같은 시각에 같은 세션에서 푼 기록은 동일 풀이로 취급한다 —
     // 같은 백업 파일을 실수로(또는 확인차) 두 번 가져와도 풀이수가 배로 부풀지 않게.
@@ -342,6 +350,7 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     for (const favorite of data.favorites) {
       await favoritesStore.put(favorite);
     }
+    await settingsStore.put(data.settings, SETTINGS_KEY);
 
     for (const questionId of affectedQuestionIds) {
       const questionAttempts = await attemptsStore.index("questionId").getAll(questionId);
@@ -352,5 +361,6 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     }
 
     await tx.done;
+    clearSettingsFallback();
   }
 }

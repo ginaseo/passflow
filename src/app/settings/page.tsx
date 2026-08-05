@@ -102,8 +102,8 @@ export default function SettingsPage() {
         attempts: backup.attempts,
         wrongNotes: backup.wrongNotes,
         favorites: backup.favorites,
+        settings: backup.settings,
       });
-      await settingsRepository.updateSettings(backup.settings);
       setSettings(backup.settings);
       setImportMessage("가져오기 완료됐다.");
     } catch (err) {

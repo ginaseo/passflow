@@ -3,6 +3,7 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { IndexedDbProgressRepository } from "./ProgressRepository";
 import { getDb } from "./db";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 
 beforeEach(async () => {
   // 테스트마다 DB를 비운다: fake-indexeddb는 프로세스 전역이라 이전 테스트의 데이터가 남는다.
@@ -11,6 +12,7 @@ beforeEach(async () => {
   await db.clear("questionStats");
   await db.clear("wrongNotes");
   await db.clear("favorites");
+  await db.clear("settings");
   localStorage.clear();
 });
 
@@ -244,6 +246,7 @@ describe("IndexedDbProgressRepository", () => {
       ],
       wrongNotes: [{ questionId: "q1", addedAt: 9999, mode: "exam" }],
       favorites: [{ questionId: "q2", addedAt: 8888 }],
+      settings: DEFAULT_SETTINGS,
     });
 
     const wrongNotes = await repo.getWrongNotes();
@@ -284,6 +287,7 @@ describe("IndexedDbProgressRepository", () => {
       ],
       wrongNotes: [],
       favorites: [],
+      settings: DEFAULT_SETTINGS,
     };
 
     await repo.importBackup(backup);
@@ -295,5 +299,20 @@ describe("IndexedDbProgressRepository", () => {
     const stats = await repo.getQuestionStats("q1");
     expect(stats.correctCount).toBe(1);
     expect(stats.wrongCount).toBe(0);
+  });
+
+  it("importBackup은 settings도 같은 트랜잭션 안에서 저장한다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    const importedSettings = { autoSaveWrongNotes: false, defaultMode: "exam" as const, timeoutBehavior: "ignore" as const };
+
+    await repo.importBackup({
+      attempts: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: importedSettings,
+    });
+
+    const db = await getDb();
+    expect(await db.get("settings", "app")).toEqual(importedSettings);
   });
 });
