@@ -42,22 +42,30 @@ function PracticeContent() {
   const resumeExamId = searchParams.get("resume");
   const [phase, setPhase] = useState<Phase>(resumeExamId ? { kind: "loading" } : { kind: "setup" });
 
-  const initialEntryType = searchParams.get("entry") === "round" ? "round" : undefined;
+  const entryParam = searchParams.get("entry");
+  const initialEntryType =
+    entryParam === "round" ? "round" : entryParam === "random" ? "random" : undefined;
 
   const modeParam = searchParams.get("mode");
   const initialMode: Mode | undefined = modeParam === "study" || modeParam === "exam" ? modeParam : undefined;
 
   const subjectParam = searchParams.get("subject");
+  const subjectNum = Number(subjectParam);
   const initialSubject: number | "all" | undefined =
-    subjectParam === "all" ? "all" : subjectParam && !Number.isNaN(Number(subjectParam)) ? Number(subjectParam) : undefined;
+    subjectParam === "all"
+      ? "all"
+      : subjectParam && Number.isInteger(subjectNum) && subjectNum in SUBJECT_NAMES
+        ? subjectNum
+        : undefined;
 
   const countParam = searchParams.get("count");
   const initialCount: 20 | 40 | 100 | undefined =
     countParam === "20" || countParam === "40" || countParam === "100" ? (Number(countParam) as 20 | 40 | 100) : undefined;
 
   const limitParam = searchParams.get("limit");
+  const limitMinutes = Number(limitParam);
   const initialTimeLimitMs: number | undefined =
-    limitParam && !Number.isNaN(Number(limitParam)) ? Number(limitParam) * 60 * 1000 : undefined;
+    limitParam && Number.isFinite(limitMinutes) && limitMinutes > 0 ? limitMinutes * 60 * 1000 : undefined;
 
   // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
   // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가

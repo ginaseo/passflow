@@ -110,4 +110,12 @@ describe("pickStratifiedRandomQuestions", () => {
     const ids = new Set(picked.map((q) => q.questionId));
     expect(ids.size).toBe(20);
   });
+
+  it("최종 결과가 과목별로 뭉쳐있지 않고 섞인다(최종 셔플 검증)", () => {
+    const pool = makeQuestionsBySubject({ 1: 20, 2: 20, 3: 20, 4: 20, 5: 20 });
+    const picked = pickStratifiedRandomQuestions(pool, 100, () => 0.5);
+    // 최종 셔플이 없으면 과목별로 그룹핑된 순서(앞 20개가 전부 같은 과목)로 나온다.
+    const firstGroupSubjects = new Set(picked.slice(0, 20).map((q) => q.subject));
+    expect(firstGroupSubjects.size).toBeGreaterThan(1);
+  });
 });
