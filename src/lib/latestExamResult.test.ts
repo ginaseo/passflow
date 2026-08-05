@@ -92,6 +92,7 @@ describe("scoreExamSession", () => {
     expect(result).toEqual({
       correct: 1,
       total: 2,
+      solved: 2,
       passed: false,
       subjectScores: [{ subject: 1, total: 2, correct: 1 }],
     });
@@ -142,6 +143,27 @@ describe("scoreExamSession", () => {
     expect(result.total).toBe(5);
     expect(result.passed).toBe(false);
     expect(result.subjectScores).toEqual([{ subject: 1, total: 5, correct: 2 }]);
+  });
+
+  it("세션 내 일부 문항만 답했으면 solved가 total보다 작다", () => {
+    const fiveQuestions = [question(1, 1), question(2, 1), question(3, 1), question(4, 1), question(5, 1)];
+    const attempts = [
+      attempt({ questionId: "2024-1-Q1", isCorrect: true, solvedAt: 100 }),
+      attempt({ questionId: "2024-1-Q2", isCorrect: true, solvedAt: 100 }),
+    ];
+    const result = scoreExamSession(fiveQuestions, attempts, "2024-1", "session-1");
+    expect(result.solved).toBe(2);
+    expect(result.total).toBe(5);
+  });
+
+  it("세션 내 모든 문항을 답했으면 solved와 total이 같다", () => {
+    const attempts = [
+      attempt({ questionId: "2024-1-Q1", isCorrect: true, solvedAt: 100 }),
+      attempt({ questionId: "2024-1-Q2", isCorrect: false, solvedAt: 100 }),
+    ];
+    const result = scoreExamSession(questions, attempts, "2024-1", "session-1");
+    expect(result.solved).toBe(2);
+    expect(result.total).toBe(2);
   });
 
   it("같은 회차를 다른 세션으로 재응시했을 때, 이전 세션의 attempt는 섞이지 않는다", () => {
