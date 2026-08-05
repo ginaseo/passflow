@@ -54,16 +54,25 @@ export default function DashboardPage() {
         const sessions = listExamSessions(attempts);
         const results = await Promise.all(
           sessions.map(async ({ examId, sessionId, solvedAt }) => {
-            const exam = exams.find((e) => e.examId === examId);
-            if (!exam) return null;
-            const questions = await questionRepository.getQuestions({ examId });
-            const score = scoreExamSession(questions, attempts, examId, sessionId);
-            return { sessionId, title: exam.title, solvedAt, ...score };
+            try {
+              const exam = exams.find((e) => e.examId === examId);
+              if (!exam) return null;
+              const questions = await questionRepository.getQuestions({ examId });
+              const score = scoreExamSession(questions, attempts, examId, sessionId);
+              return { sessionId, title: exam.title, solvedAt, ...score };
+            } catch (err) {
+              // 세션 하나 계산이 실패해도(예: 회차 JSON fetch 실패) 나머지는 보여준다.
+              console.error(`CBT 세션(${sessionId}) 계산 실패:`, err);
+              return null;
+            }
           })
         );
         setCbtResults(results.filter((r): r is CbtResult => r !== null));
       })
-      .catch((err) => console.error("CBT 결과 목록 계산 실패:", err));
+      .catch((err) => {
+        console.error("CBT 결과 목록 계산 실패:", err);
+        setCbtResults([]); // "불러오는 중..."이 영구히 남지 않게 빈 목록으로 떨어뜨린다.
+      });
   }, []);
 
   if (error) {

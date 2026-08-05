@@ -141,6 +141,7 @@ describe("scoreExamSession", () => {
     expect(result.correct).toBe(2);
     expect(result.total).toBe(5);
     expect(result.passed).toBe(false);
+    expect(result.subjectScores).toEqual([{ subject: 1, total: 5, correct: 2 }]);
   });
 
   it("같은 회차를 다른 세션으로 재응시했을 때, 이전 세션의 attempt는 섞이지 않는다", () => {
