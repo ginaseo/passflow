@@ -20,6 +20,7 @@ export type PracticeSetupValue =
 
 interface PracticeSetupProps {
   onStart: (value: PracticeSetupValue) => void;
+  initialEntryType?: "random" | "round";
 }
 
 const questionRepository = new JsonQuestionRepository();
@@ -38,9 +39,9 @@ const STATUS_STYLE: Record<ExamStatus, string> = {
   완료: "text-green-600",
 };
 
-export function PracticeSetup({ onStart }: PracticeSetupProps) {
+export function PracticeSetup({ onStart, initialEntryType }: PracticeSetupProps) {
   const [mode, setMode] = useState<Mode>("study");
-  const [entryType, setEntryType] = useState<"random" | "round">("random");
+  const [entryType, setEntryType] = useState<"random" | "round">(initialEntryType ?? "random");
   const [subject, setSubject] = useState<number | "all">("all");
   const [count, setCount] = useState<20 | 40 | 100>(20);
   const [timeLimitMs, setTimeLimitMs] = useState<number | null>(null);
