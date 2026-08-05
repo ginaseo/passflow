@@ -31,7 +31,12 @@ describe("IndexedDbSettingsRepository", () => {
 
   it("updateSettings로 저장한 값을 getSettings가 그대로 반환한다", async () => {
     const repo = new IndexedDbSettingsRepository();
-    const next = { autoSaveWrongNotes: false, defaultMode: "exam" as const, timeoutBehavior: "ignore" as const };
+    const next = {
+      autoSaveWrongNotes: false,
+      defaultMode: "exam" as const,
+      timeoutBehavior: "ignore" as const,
+      reviewOrder: "random" as const,
+    };
 
     await repo.updateSettings(next);
 

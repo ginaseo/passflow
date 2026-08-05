@@ -312,7 +312,12 @@ describe("IndexedDbProgressRepository", () => {
 
   it("importBackup은 settings도 같은 트랜잭션 안에서 저장한다", async () => {
     const repo = new IndexedDbProgressRepository();
-    const importedSettings = { autoSaveWrongNotes: false, defaultMode: "exam" as const, timeoutBehavior: "ignore" as const };
+    const importedSettings = {
+      autoSaveWrongNotes: false,
+      defaultMode: "exam" as const,
+      timeoutBehavior: "ignore" as const,
+      reviewOrder: "random" as const,
+    };
 
     await repo.importBackup({
       attempts: [],

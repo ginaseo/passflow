@@ -47,7 +47,8 @@ function isValidSettings(value: unknown): value is Settings {
   return (
     typeof s.autoSaveWrongNotes === "boolean" &&
     (s.defaultMode === "study" || s.defaultMode === "exam") &&
-    (s.timeoutBehavior === "wrong" || s.timeoutBehavior === "warn" || s.timeoutBehavior === "ignore")
+    (s.timeoutBehavior === "wrong" || s.timeoutBehavior === "warn" || s.timeoutBehavior === "ignore") &&
+    (s.reviewOrder === undefined || s.reviewOrder === "sequential" || s.reviewOrder === "random")
   );
 }
 
