@@ -21,6 +21,10 @@ export type PracticeSetupValue =
 interface PracticeSetupProps {
   onStart: (value: PracticeSetupValue) => void;
   initialEntryType?: "random" | "round";
+  initialMode?: Mode;
+  initialSubject?: number | "all";
+  initialCount?: 20 | 40 | 100;
+  initialTimeLimitMs?: number | null;
 }
 
 const questionRepository = new JsonQuestionRepository();
@@ -39,12 +43,19 @@ const STATUS_STYLE: Record<ExamStatus, string> = {
   완료: "text-green-600",
 };
 
-export function PracticeSetup({ onStart, initialEntryType }: PracticeSetupProps) {
-  const [mode, setMode] = useState<Mode>("study");
+export function PracticeSetup({
+  onStart,
+  initialEntryType,
+  initialMode,
+  initialSubject,
+  initialCount,
+  initialTimeLimitMs,
+}: PracticeSetupProps) {
+  const [mode, setMode] = useState<Mode>(initialMode ?? "study");
   const [entryType, setEntryType] = useState<"random" | "round">(initialEntryType ?? "random");
-  const [subject, setSubject] = useState<number | "all">("all");
-  const [count, setCount] = useState<20 | 40 | 100>(20);
-  const [timeLimitMs, setTimeLimitMs] = useState<number | null>(null);
+  const [subject, setSubject] = useState<number | "all">(initialSubject ?? "all");
+  const [count, setCount] = useState<20 | 40 | 100>(initialCount ?? 20);
+  const [timeLimitMs, setTimeLimitMs] = useState<number | null>(initialTimeLimitMs ?? null);
   const [examId, setExamId] = useState<string | null>(null);
   const [exams, setExams] = useState<ExamSummary[] | null>(null);
   const [statuses, setStatuses] = useState<Map<string, ExamStatus>>(new Map());
