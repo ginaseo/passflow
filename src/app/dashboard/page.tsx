@@ -39,6 +39,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [cbtResults, setCbtResults] = useState<CbtResult[] | null>(null);
+  const [cbtError, setCbtError] = useState(false);
 
   useEffect(() => {
     progressRepository.getDashboardSummary().then(
@@ -71,7 +72,7 @@ export default function DashboardPage() {
       })
       .catch((err) => {
         console.error("CBT 결과 목록 계산 실패:", err);
-        setCbtResults([]); // "불러오는 중..."이 영구히 남지 않게 빈 목록으로 떨어뜨린다.
+        setCbtError(true);
       });
   }, []);
 
@@ -112,7 +113,9 @@ export default function DashboardPage() {
 
       <div className="flex flex-col gap-3">
         <h2 className="font-medium">CBT 응시 기록</h2>
-        {cbtResults === null ? (
+        {cbtError ? (
+          <p className="text-sm text-red-700">CBT 응시 기록을 불러오지 못했다. 다시 시도해달라.</p>
+        ) : cbtResults === null ? (
           <p className="text-sm text-gray-500">불러오는 중...</p>
         ) : cbtResults.length === 0 ? (
           <p className="text-sm text-gray-500">아직 시험모드로 회차 전체를 응시한 기록이 없다.</p>
