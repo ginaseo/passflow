@@ -31,6 +31,11 @@ function reconcileIfNeeded(db: Awaited<ReturnType<typeof getDb>>): Promise<void>
 async function doReconcile(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
   if (!hasLocalStorageData(SETTINGS_FALLBACK_KEY)) return;
   const leftover = readLocalStorage(SETTINGS_FALLBACK_KEY, DEFAULT_SETTINGS);
+  // ponytail: 다른 탭이 이 사이 마커를 지웠으면(예: 백업 가져오기가 최신 settings로
+  // 덮어쓰고 마커도 지운 경우) 방금 읽은 오래된 값을 다시 쓰지 않는다. 완벽한 탭간
+  // 락은 아니고 창을 좁히는 수준 — 필요해지면 마커 자체를 IndexedDB로 옮겨서
+  // 트랜잭션으로 보호.
+  if (!hasLocalStorageData(SETTINGS_FALLBACK_KEY)) return;
   await db.put("settings", leftover, SETTINGS_KEY);
   clearLocalStorage(SETTINGS_FALLBACK_KEY);
 }
