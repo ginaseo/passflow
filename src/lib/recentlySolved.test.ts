@@ -7,6 +7,7 @@ function makeAttempt(overrides: Partial<Attempt>): Attempt {
     questionId: "Q1",
     solvedAt: 1000,
     mode: "study",
+    entryType: "round",
     selectedAnswer: 1,
     isCorrect: true,
     solveTimeMs: 1000,

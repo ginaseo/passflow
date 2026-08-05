@@ -26,6 +26,7 @@ describe("IndexedDbProgressRepository — attempts 쓰기 실패가 다른 스�
       questionId: "q1",
       solvedAt: 1000,
       mode: "study",
+      entryType: "round",
       selectedAnswer: 1,
       isCorrect: true,
       solveTimeMs: 1000,

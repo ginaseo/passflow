@@ -7,6 +7,7 @@ function attempt(overrides: Partial<Attempt> & { questionId: string }): Attempt 
   return {
     solvedAt: 0,
     mode: "exam",
+    entryType: "round",
     selectedAnswer: 1,
     isCorrect: true,
     solveTimeMs: 0,
@@ -60,6 +61,23 @@ describe("pickLatestExamSession", () => {
       attempt({ questionId: "2024-2-Q2", mode: "study", solvedAt: 5100, sessionId: "session-b", isCorrect: true }),
     ];
     expect(pickLatestExamSession(attempts)).toEqual({ examId: "2024-1", sessionId: "session-a" });
+  });
+
+  it("entryType이 random인 시험모드 attempt는 CBT 결과 후보에서 제외한다", () => {
+    const attempts = [
+      // 오래된 진짜 회차 전체 CBT (entryType: round)
+      attempt({ questionId: "2024-1-Q1", mode: "exam", entryType: "round", solvedAt: 1000, sessionId: "session-a", isCorrect: true }),
+      // 더 최근이지만 시험모드+랜덤 조합(entryType: random) — 회차 일부만 우연히 건드림
+      attempt({ questionId: "2024-1-Q5", mode: "exam", entryType: "random", solvedAt: 9999, sessionId: "session-b", isCorrect: false }),
+    ];
+    expect(pickLatestExamSession(attempts)).toEqual({ examId: "2024-1", sessionId: "session-a" });
+  });
+
+  it("entryType 필드 자체가 없는(undefined) 구버전 attempt는 round로 취급돼서 CBT 후보에 포함된다", () => {
+    const legacyAttempt = attempt({ questionId: "2024-1-Q1", mode: "exam", solvedAt: 1000, sessionId: "session-a" });
+    // @ts-expect-error entryType이 도입되기 전에 기록된 실제 IndexedDB 데이터를 흉내낸다 — 타입은 required지만 런타임엔 없을 수 있다.
+    delete legacyAttempt.entryType;
+    expect(pickLatestExamSession([legacyAttempt])).toEqual({ examId: "2024-1", sessionId: "session-a" });
   });
 });
 

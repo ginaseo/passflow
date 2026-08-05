@@ -13,6 +13,7 @@ function attempt(questionId: string): Attempt {
     questionId,
     solvedAt: 0,
     mode: "study",
+    entryType: "round",
     selectedAnswer: 1,
     isCorrect: true,
     solveTimeMs: 0,

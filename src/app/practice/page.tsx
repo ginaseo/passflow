@@ -14,15 +14,13 @@ import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { DEFAULT_SETTINGS } from "@/types/settings";
-import type { Mode } from "@/types/progress";
+import type { EntryType, Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 const questionRepository = new JsonQuestionRepository();
 const progressRepository = new IndexedDbProgressRepository();
 const settingsRepository = new IndexedDbSettingsRepository();
-
-type EntryType = "round" | "random";
 
 type Phase =
   | { kind: "setup" }
@@ -52,7 +50,15 @@ function PracticeContent() {
   const latestResumeRequestId = useRef(0);
 
   useEffect(() => {
-    if (!resumeExamId) return;
+    if (!resumeExamId) {
+      // resume 쿼리가 사라졌으면(예: nav의 "문제풀이" 링크로 같은 /practice 인스턴스에
+      // 머무른 채 재진입) 진행 중이던 resume 로드를 무효화하고 setup 화면으로 되돌린다.
+      latestResumeRequestId.current++;
+      queueMicrotask(() => {
+        setPhase((prev) => (prev.kind === "setup" ? prev : { kind: "setup" }));
+      });
+      return;
+    }
     const requestId = ++latestResumeRequestId.current;
 
     (async () => {
@@ -235,6 +241,7 @@ function PracticeContent() {
       questions={phase.questions}
       theoryMap={phase.theoryMap}
       mode={phase.mode}
+      entryType={phase.entryType}
       timeLimitMs={phase.timeLimitMs}
       autoSaveWrongNotes={phase.autoSaveWrongNotes}
       onFinish={(summary) => setPhase({ kind: "done", summary, mode: phase.mode, entryType: phase.entryType })}

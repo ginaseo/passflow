@@ -12,6 +12,7 @@ function attempt(overrides: Partial<Attempt> & { questionId: string }): Attempt 
   return {
     solvedAt: 0,
     mode: "study",
+    entryType: "round",
     selectedAnswer: 1,
     isCorrect: true,
     solveTimeMs: 0,

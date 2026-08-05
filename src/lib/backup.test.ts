@@ -9,6 +9,7 @@ function makeAttempt(overrides: Partial<Attempt> = {}): Attempt {
     questionId: "Q1",
     solvedAt: 1000,
     mode: "study",
+    entryType: "round",
     selectedAnswer: 1,
     isCorrect: true,
     solveTimeMs: 500,
@@ -36,6 +37,7 @@ describe("serializeBackup", () => {
         questionId: "Q1",
         solvedAt: 1000,
         mode: "study",
+        entryType: "round",
         selectedAnswer: 1,
         isCorrect: true,
         solveTimeMs: 500,
@@ -128,6 +130,25 @@ describe("parseBackup", () => {
 
     expect(backup).not.toBeNull();
     expect(backup?.attempts[0]).not.toHaveProperty("id");
+  });
+
+  it("entryType 필드가 없는 구버전 백업의 attempt는 거부하지 않고 round로 채워서 통과시킨다", () => {
+    const legacyAttempt: Record<string, unknown> = { ...makeAttempt() };
+    delete legacyAttempt.entryType;
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [legacyAttempt],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: DEFAULT_SETTINGS,
+    });
+
+    const backup = parseBackup(json);
+
+    expect(backup).not.toBeNull();
+    expect(backup?.attempts[0].entryType).toBe("round");
   });
 
   it("attempts 원소의 필드 타입이 잘못되면 전체를 null로 거부한다", () => {
