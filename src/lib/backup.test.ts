@@ -112,4 +112,62 @@ describe("parseBackup", () => {
     });
     expect(parseBackup(json)).toBeNull();
   });
+
+  it("attempts 원소에 id 필드가 섞여 있어도 결과에서 제거된다", () => {
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [{ ...makeAttempt(), id: 999 }],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: DEFAULT_SETTINGS,
+    });
+
+    const backup = parseBackup(json);
+
+    expect(backup).not.toBeNull();
+    expect(backup?.attempts[0]).not.toHaveProperty("id");
+  });
+
+  it("attempts 원소의 필드 타입이 잘못되면 전체를 null로 거부한다", () => {
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [{ ...makeAttempt(), isCorrect: "yes" }],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: DEFAULT_SETTINGS,
+    });
+
+    expect(parseBackup(json)).toBeNull();
+  });
+
+  it("questionStats/wrongNotes/favorites 원소의 필수 필드가 빠지면 null을 반환한다", () => {
+    const base = {
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: DEFAULT_SETTINGS,
+    };
+
+    expect(
+      parseBackup(JSON.stringify({ ...base, questionStats: [{ questionId: "Q1", correctCount: 1 }] }))
+    ).toBeNull();
+    expect(
+      parseBackup(
+        JSON.stringify({
+          ...base,
+          questionStats: [],
+          wrongNotes: [{ questionId: "Q1", addedAt: 1000, mode: "invalid-mode" }],
+        })
+      )
+    ).toBeNull();
+    expect(
+      parseBackup(JSON.stringify({ ...base, questionStats: [], favorites: [{ questionId: "Q1" }] }))
+    ).toBeNull();
+  });
 });

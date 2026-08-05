@@ -3,6 +3,7 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { IndexedDbProgressRepository } from "./ProgressRepository";
 import { getDb } from "./db";
+import { DEFAULT_SETTINGS } from "@/types/settings";
 
 beforeEach(async () => {
   const db = await getDb();
@@ -10,6 +11,7 @@ beforeEach(async () => {
   await db.clear("questionStats");
   await db.clear("wrongNotes");
   await db.clear("favorites");
+  await db.clear("settings");
   localStorage.clear();
 });
 
@@ -42,6 +44,7 @@ describe("IndexedDbProgressRepository — importBackup과 대기중인 RESET_PEN
       ],
       wrongNotes: [],
       favorites: [],
+      settings: DEFAULT_SETTINGS,
     });
 
     // reset_pending이 importBackup 시작 시점에 이미 처리됐어야 하므로,

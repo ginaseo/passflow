@@ -9,8 +9,15 @@ import {
   writeLocalStorage,
 } from "./storageFallback";
 
-const SETTINGS_KEY = "app";
+export const SETTINGS_KEY = "app";
 const SETTINGS_FALLBACK_KEY = "settings_fallback";
+
+// importBackup이 settings를 attempts/wrongNotes/favorites와 같은 IndexedDB
+// 트랜잭션에 넣을 때, 남아있던 폴백 데이터가 나중에 reconcile되며 방금 가져온
+// settings를 덮어쓰지 않도록 미리 지워둔다.
+export function clearSettingsFallback(): void {
+  clearLocalStorage(SETTINGS_FALLBACK_KEY);
+}
 
 let reconcilePromise: Promise<void> | null = null;
 
