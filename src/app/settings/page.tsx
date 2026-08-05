@@ -26,7 +26,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     settingsRepository.getSettings().then(
-      (result) => setSettings({ ...DEFAULT_SETTINGS, ...result }),
+      (result) => setSettings(result),
       (err) => {
         console.error("getSettings failed:", err);
         setSettings(DEFAULT_SETTINGS);

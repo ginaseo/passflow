@@ -1,5 +1,5 @@
 import type { Attempt, Favorite, QuestionStats, WrongNote } from "@/types/progress";
-import type { Settings } from "@/types/settings";
+import { DEFAULT_SETTINGS, type Settings } from "@/types/settings";
 
 export const BACKUP_VERSION = 1;
 
@@ -50,6 +50,13 @@ function isValidSettings(value: unknown): value is Settings {
     (s.timeoutBehavior === "wrong" || s.timeoutBehavior === "warn" || s.timeoutBehavior === "ignore") &&
     (s.reviewOrder === undefined || s.reviewOrder === "sequential" || s.reviewOrder === "random")
   );
+}
+
+// isValidSettings는 reviewOrder가 없는 것도 통과시키므로(구버전 백업 호환),
+// 통과된 값이라도 필드가 실제로 비어 있을 수 있다 — 소비자에게 넘기기 전에
+// 여기서 채워 넣는다. normalizeAttempt와 같은 이유로 파싱 경계에서 정규화한다.
+function normalizeSettings(value: Settings): Settings {
+  return { ...DEFAULT_SETTINGS, ...value };
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -169,6 +176,6 @@ export function parseBackup(text: string): Backup | null {
     questionStats: questionStats as QuestionStats[],
     wrongNotes: wrongNotes as WrongNote[],
     favorites: favorites as Favorite[],
-    settings: obj.settings,
+    settings: normalizeSettings(obj.settings),
   };
 }

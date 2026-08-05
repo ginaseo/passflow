@@ -148,11 +148,10 @@ export default function ReviewPage() {
   async function handleRetry(selectedQuestions: Question[]) {
     if (selectedQuestions.length === 0) return;
     try {
-      const [theoryMap, settingsResult] = await Promise.all([
+      const [theoryMap, settings] = await Promise.all([
         questionRepository.getTheoryMap(),
         settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS),
       ]);
-      const settings = { ...DEFAULT_SETTINGS, ...settingsResult };
       const orderedQuestions =
         settings.reviewOrder === "random"
           ? pickRandomQuestions(selectedQuestions, selectedQuestions.length)
