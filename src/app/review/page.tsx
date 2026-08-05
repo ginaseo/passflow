@@ -205,6 +205,7 @@ export default function ReviewPage() {
         questions={phase.questions}
         theoryMap={phase.theoryMap}
         mode="study"
+        entryType="random"
         timeLimitMs={null}
         autoSaveWrongNotes={phase.autoSaveWrongNotes}
         onFinish={(summary) => setPhase({ kind: "done", summary })}

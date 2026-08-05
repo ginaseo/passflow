@@ -1,10 +1,12 @@
 export type Mode = "exam" | "study";
+export type EntryType = "round" | "random";
 
 export interface Attempt {
   id?: number;
   questionId: string;
   solvedAt: number;
   mode: Mode;
+  entryType: EntryType;
   selectedAnswer: number;
   isCorrect: boolean;
   solveTimeMs: number;

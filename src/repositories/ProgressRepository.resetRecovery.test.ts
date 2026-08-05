@@ -20,6 +20,7 @@ describe("IndexedDbProgressRepository — resetAll이 IndexedDB clear에 실패�
       questionId: "q1",
       solvedAt: 1,
       mode: "study",
+      entryType: "round",
       selectedAnswer: 1,
       isCorrect: true,
       solveTimeMs: 1,

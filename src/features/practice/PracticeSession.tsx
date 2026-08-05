@@ -8,7 +8,7 @@ import { resolveTheoryLink } from "@/lib/theory";
 import { summarizeSession, type SessionSummary } from "@/lib/summary";
 import { formatDuration, remainingMs } from "@/lib/timer";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
-import type { Mode } from "@/types/progress";
+import type { EntryType, Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
@@ -16,6 +16,7 @@ interface PracticeSessionProps {
   questions: Question[];
   theoryMap: TheoryMap;
   mode: Mode;
+  entryType: EntryType;
   timeLimitMs: number | null;
   autoSaveWrongNotes: boolean;
   onFinish: (summary: SessionSummary) => void;
@@ -27,6 +28,7 @@ export function PracticeSession({
   questions,
   theoryMap,
   mode,
+  entryType,
   timeLimitMs,
   autoSaveWrongNotes,
   onFinish,
@@ -84,6 +86,7 @@ export function PracticeSession({
           questionId: question.questionId,
           solvedAt: Date.now(),
           mode,
+          entryType,
           selectedAnswer: answer,
           isCorrect,
           solveTimeMs: Date.now() - questionStartedAt,
@@ -128,6 +131,7 @@ export function PracticeSession({
           questionId: q.questionId,
           solvedAt: Date.now(),
           mode: "exam",
+          entryType,
           selectedAnswer: answer,
           isCorrect,
           solveTimeMs: avgSolveTimeMs,

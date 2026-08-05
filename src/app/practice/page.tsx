@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/PracticeSetup";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { AnswerGrid } from "@/features/practice/AnswerGrid";
@@ -8,17 +9,18 @@ import { pickRandomQuestions } from "@/lib/sampling";
 import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
 import { SUBJECT_NAMES } from "@/lib/theory";
+import { getUnansweredQuestions } from "@/lib/resumeExam";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { DEFAULT_SETTINGS } from "@/types/settings";
-import type { Mode } from "@/types/progress";
+import type { EntryType, Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 const questionRepository = new JsonQuestionRepository();
+const progressRepository = new IndexedDbProgressRepository();
 const settingsRepository = new IndexedDbSettingsRepository();
-
-type EntryType = "round" | "random";
 
 type Phase =
   | { kind: "setup" }
@@ -35,8 +37,65 @@ type Phase =
   | { kind: "done"; summary: SessionSummary; mode: Mode; entryType: EntryType }
   | { kind: "error"; message: string };
 
-export default function PracticePage() {
-  const [phase, setPhase] = useState<Phase>({ kind: "setup" });
+function PracticeContent() {
+  const searchParams = useSearchParams();
+  const resumeExamId = searchParams.get("resume");
+  const [phase, setPhase] = useState<Phase>(resumeExamId ? { kind: "loading" } : { kind: "setup" });
+
+  const initialEntryType = searchParams.get("entry") === "round" ? "round" : undefined;
+
+  // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
+  // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가
+  // 나중에 끝나며 최신 상태를 덮어쓰지 않게 막는다.
+  const latestResumeRequestId = useRef(0);
+
+  useEffect(() => {
+    if (!resumeExamId) {
+      // resume 쿼리가 사라졌으면(예: nav의 "문제풀이" 링크로 같은 /practice 인스턴스에
+      // 머무른 채 재진입) 진행 중이던 resume 로드를 무효화하고 setup 화면으로 되돌린다.
+      latestResumeRequestId.current++;
+      queueMicrotask(() => {
+        setPhase((prev) => (prev.kind === "setup" ? prev : { kind: "setup" }));
+      });
+      return;
+    }
+    const requestId = ++latestResumeRequestId.current;
+
+    (async () => {
+      setPhase({ kind: "loading" });
+      try {
+        const [pool, attempts, theoryMap, settings] = await Promise.all([
+          questionRepository.getQuestions({ examId: resumeExamId }),
+          progressRepository.getAttempts(),
+          questionRepository.getTheoryMap(),
+          settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS),
+        ]);
+        if (requestId !== latestResumeRequestId.current) return;
+
+        const questions = getUnansweredQuestions(pool, attempts, resumeExamId).sort(
+          (a, b) => a.qnum - b.qnum
+        );
+
+        if (questions.length === 0) {
+          setPhase({ kind: "error", message: "이어서 풀 문항이 없다." });
+          return;
+        }
+
+        setPhase({
+          kind: "active",
+          questions,
+          theoryMap,
+          mode: "study",
+          entryType: "round",
+          timeLimitMs: null,
+          autoSaveWrongNotes: settings.autoSaveWrongNotes,
+        });
+      } catch {
+        if (requestId !== latestResumeRequestId.current) return;
+        setPhase({ kind: "error", message: "이어서 풀 문항을 불러오지 못했다. 다시 시도해달라." });
+      }
+    })();
+  }, [resumeExamId]);
 
   async function start(value: PracticeSetupValue) {
     setPhase({ kind: "loading" });
@@ -103,7 +162,7 @@ export default function PracticePage() {
   }
 
   if (phase.kind === "setup") {
-    return <PracticeSetup onStart={start} />;
+    return <PracticeSetup onStart={start} initialEntryType={initialEntryType} />;
   }
 
   if (phase.kind === "loading") {
@@ -182,9 +241,18 @@ export default function PracticePage() {
       questions={phase.questions}
       theoryMap={phase.theoryMap}
       mode={phase.mode}
+      entryType={phase.entryType}
       timeLimitMs={phase.timeLimitMs}
       autoSaveWrongNotes={phase.autoSaveWrongNotes}
       onFinish={(summary) => setPhase({ kind: "done", summary, mode: phase.mode, entryType: phase.entryType })}
     />
+  );
+}
+
+export default function PracticePage() {
+  return (
+    <Suspense fallback={<p className="text-center p-10">불러오는 중...</p>}>
+      <PracticeContent />
+    </Suspense>
   );
 }
