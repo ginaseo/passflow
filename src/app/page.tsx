@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
-import { pickLatestCompletedExamId, scoreExamFromAttempts } from "@/lib/latestExamResult";
+import { pickLatestExamSession, scoreExamSession } from "@/lib/latestExamResult";
 import { pickResumeExamId } from "@/lib/resumeExam";
 import type { DashboardSummary } from "@/types/progress";
 
@@ -43,14 +43,13 @@ export default function HomePage() {
         const resumeExamEntry = resumeExamId ? exams.find((e) => e.examId === resumeExamId) : undefined;
         setResumeExam(resumeExamId && resumeExamEntry ? { examId: resumeExamId, title: resumeExamEntry.title } : null);
 
-        const latestExamId = pickLatestCompletedExamId(exams, attempts);
-        if (!latestExamId) return;
-        const exam = exams.find((e) => e.examId === latestExamId);
+        const latestSession = pickLatestExamSession(attempts);
+        if (!latestSession) return;
+        const exam = exams.find((e) => e.examId === latestSession.examId);
         if (!exam) return;
 
-        const questions = await questionRepository.getQuestions({ examId: latestExamId });
-        const score = scoreExamFromAttempts(questions, attempts, latestExamId);
-        if (!score) return;
+        const questions = await questionRepository.getQuestions({ examId: latestSession.examId });
+        const score = scoreExamSession(questions, attempts, latestSession.examId, latestSession.sessionId);
         setLatestExam({ title: exam.title, ...score });
       })
       .catch((err) => console.error("최근 CBT 결과 계산 실패:", err));

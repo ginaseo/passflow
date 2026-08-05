@@ -1,32 +1,31 @@
-import { computeExamStatuses, pickMostRecentlyTouchedExam } from "./examStatus";
 import { parseQuestionId } from "./questionId";
 import { isPassed, type SubjectScore } from "./summary";
 import type { Attempt } from "@/types/progress";
-import type { ExamSummary, Question } from "@/types/question";
+import type { Question } from "@/types/question";
 
-export function pickLatestCompletedExamId(exams: ExamSummary[], attempts: Attempt[]): string | null {
-  const statuses = computeExamStatuses(exams, attempts);
-  const completedExamIds = exams
-    .filter((exam) => statuses.get(exam.examId) === "완료")
-    .map((exam) => exam.examId);
-  return pickMostRecentlyTouchedExam(completedExamIds, attempts);
+export function pickLatestExamSession(attempts: Attempt[]): { examId: string; sessionId: string } | null {
+  const examAttempts = attempts.filter((a) => a.mode === "exam");
+  if (examAttempts.length === 0) return null;
+
+  const latest = examAttempts.reduce((max, a) => (a.solvedAt > max.solvedAt ? a : max));
+  const { examId } = parseQuestionId(latest.questionId);
+  return { examId, sessionId: latest.sessionId };
 }
 
-export function scoreExamFromAttempts(
+export function scoreExamSession(
   questions: Question[],
   attempts: Attempt[],
-  examId: string
-): { correct: number; total: number; passed: boolean } | null {
-  const latestByQnum = new Map<number, Attempt>();
+  examId: string,
+  sessionId: string
+): { correct: number; total: number; passed: boolean } {
+  const byQnum = new Map<number, Attempt>();
   for (const a of attempts) {
-    if (a.mode !== "exam") continue;
+    if (a.mode !== "exam" || a.sessionId !== sessionId) continue;
     const { examId: attemptExamId, qnum } = parseQuestionId(a.questionId);
     if (attemptExamId !== examId) continue;
-    const prev = latestByQnum.get(qnum);
-    if (!prev || a.solvedAt > prev.solvedAt) latestByQnum.set(qnum, a);
+    const prev = byQnum.get(qnum);
+    if (!prev || a.solvedAt > prev.solvedAt) byQnum.set(qnum, a);
   }
-
-  if (latestByQnum.size === 0) return null;
 
   const bySubject = new Map<number, SubjectScore>();
   let correct = 0;
@@ -35,7 +34,7 @@ export function scoreExamFromAttempts(
   for (const q of questions) {
     const subjectScore = bySubject.get(q.subject) ?? { subject: q.subject, total: 0, correct: 0 };
     subjectScore.total++;
-    const a = latestByQnum.get(q.qnum);
+    const a = byQnum.get(q.qnum);
     if (a?.isCorrect) {
       subjectScore.correct++;
       correct++;
@@ -44,6 +43,5 @@ export function scoreExamFromAttempts(
   }
 
   const passed = isPassed([...bySubject.values()]);
-
   return { correct, total, passed };
 }

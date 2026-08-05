@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { pickLatestCompletedExamId, scoreExamFromAttempts } from "./latestExamResult";
+import { pickLatestExamSession, scoreExamSession } from "./latestExamResult";
 import type { Attempt } from "@/types/progress";
-import type { ExamSummary, Question } from "@/types/question";
-
-const exams: ExamSummary[] = [
-  { examId: "2024-1", title: "2024년 1회", count: 2 },
-  { examId: "2024-2", title: "2024년 2회", count: 2 },
-];
+import type { Question } from "@/types/question";
 
 function attempt(overrides: Partial<Attempt> & { questionId: string }): Attempt {
   return {
@@ -34,62 +29,59 @@ function question(qnum: number, subject: number): Question {
   };
 }
 
-describe("pickLatestCompletedExamId", () => {
-  it("완료된 회차가 없으면 null", () => {
-    expect(pickLatestCompletedExamId(exams, [])).toBeNull();
+describe("pickLatestExamSession", () => {
+  it("exam모드 attempt가 하나도 없으면 null", () => {
+    expect(pickLatestExamSession([])).toBeNull();
   });
 
-  it("완료된 회차 중 가장 최근 것을 고른다", () => {
+  it("study모드 attempt만 있으면 null", () => {
     const attempts = [
-      attempt({ questionId: "2024-1-Q1", solvedAt: 1000 }),
-      attempt({ questionId: "2024-1-Q2", solvedAt: 1100 }),
-      attempt({ questionId: "2024-2-Q1", solvedAt: 2000 }),
-      attempt({ questionId: "2024-2-Q2", solvedAt: 2100 }),
+      attempt({ questionId: "2024-1-Q1", mode: "study", solvedAt: 1000 }),
+      attempt({ questionId: "2024-1-Q2", mode: "study", solvedAt: 1100 }),
     ];
-    expect(pickLatestCompletedExamId(exams, attempts)).toBe("2024-2");
+    expect(pickLatestExamSession(attempts)).toBeNull();
   });
 
-  it("일부만 푼(진행중) 회차는 후보에서 제외한다", () => {
+  it("가장 최근 exam모드 attempt의 회차/세션을 고른다", () => {
     const attempts = [
-      attempt({ questionId: "2024-1-Q1", solvedAt: 1000 }),
-      attempt({ questionId: "2024-1-Q2", solvedAt: 1100 }),
-      attempt({ questionId: "2024-2-Q1", solvedAt: 9999 }), // 2024-2는 1문항만 풀어서 진행중
+      attempt({ questionId: "2024-1-Q1", solvedAt: 1000, sessionId: "session-a" }),
+      attempt({ questionId: "2024-2-Q1", solvedAt: 2000, sessionId: "session-b" }),
     ];
-    expect(pickLatestCompletedExamId(exams, attempts)).toBe("2024-1");
+    expect(pickLatestExamSession(attempts)).toEqual({ examId: "2024-2", sessionId: "session-b" });
+  });
+
+  it("더 최근에 study모드로만 완료된 회차가 있어도 exam모드 attempt가 있는(더 오래된) 진짜 CBT 세션을 고른다", () => {
+    const attempts = [
+      // 오래된 진짜 CBT 세션 (exam모드)
+      attempt({ questionId: "2024-1-Q1", mode: "exam", solvedAt: 1000, sessionId: "session-a", isCorrect: true }),
+      attempt({ questionId: "2024-1-Q2", mode: "exam", solvedAt: 1100, sessionId: "session-a", isCorrect: true }),
+      // 더 최근이지만 study모드로만 완료(exam모드 attempt 없음)
+      attempt({ questionId: "2024-2-Q1", mode: "study", solvedAt: 5000, sessionId: "session-b", isCorrect: true }),
+      attempt({ questionId: "2024-2-Q2", mode: "study", solvedAt: 5100, sessionId: "session-b", isCorrect: true }),
+    ];
+    expect(pickLatestExamSession(attempts)).toEqual({ examId: "2024-1", sessionId: "session-a" });
   });
 });
 
-describe("scoreExamFromAttempts", () => {
+describe("scoreExamSession", () => {
   const questions = [question(1, 1), question(2, 1)];
-
-  it("exam모드 attempt가 하나도 없으면 null", () => {
-    expect(scoreExamFromAttempts(questions, [], "2024-1")).toBeNull();
-  });
-
-  it("study모드 attempt만 있으면 null(CBT 성적에 안 씀)", () => {
-    const attempts = [
-      attempt({ questionId: "2024-1-Q1", mode: "study", isCorrect: true }),
-      attempt({ questionId: "2024-1-Q2", mode: "study", isCorrect: true }),
-    ];
-    expect(scoreExamFromAttempts(questions, attempts, "2024-1")).toBeNull();
-  });
 
   it("exam모드 정답/오답을 채점하고 합격여부를 판정한다", () => {
     const attempts = [
       attempt({ questionId: "2024-1-Q1", isCorrect: true, solvedAt: 100 }),
       attempt({ questionId: "2024-1-Q2", isCorrect: false, solvedAt: 200 }),
     ];
-    const result = scoreExamFromAttempts(questions, attempts, "2024-1");
+    const result = scoreExamSession(questions, attempts, "2024-1", "session-1");
     expect(result).toEqual({ correct: 1, total: 2, passed: false });
   });
 
-  it("같은 문항을 여러 번 풀었으면 가장 최근 것으로 채점한다", () => {
+  it("같은 세션 안에서 같은 문항을 여러 번 풀었으면 가장 최근 것으로 채점한다", () => {
     const attempts = [
       attempt({ questionId: "2024-1-Q1", isCorrect: false, solvedAt: 100 }),
       attempt({ questionId: "2024-1-Q1", isCorrect: true, solvedAt: 200 }),
       attempt({ questionId: "2024-1-Q2", isCorrect: true, solvedAt: 100 }),
     ];
-    const result = scoreExamFromAttempts(questions, attempts, "2024-1");
+    const result = scoreExamSession(questions, attempts, "2024-1", "session-1");
     expect(result).toEqual({ correct: 2, total: 2, passed: true });
   });
 
@@ -99,18 +91,35 @@ describe("scoreExamFromAttempts", () => {
       attempt({ questionId: "2024-1-Q2", isCorrect: true, solvedAt: 100 }),
       attempt({ questionId: "2024-2-Q1", isCorrect: false, solvedAt: 999 }), // 다른 회차의 같은 qnum
     ];
-    const result = scoreExamFromAttempts(questions, attempts, "2024-1");
+    const result = scoreExamSession(questions, attempts, "2024-1", "session-1");
     expect(result).toEqual({ correct: 2, total: 2, passed: true });
   });
 
-  it("exam모드로 안 푼 문항(이어서풀기로 study모드만 채운 경우)은 오답으로 처리되고 분모에 포함된다", () => {
+  it("세션 안에서 exam모드로 안 푼 문항은 오답으로 처리되고 분모에 포함된다", () => {
     const fiveQuestions = [question(1, 1), question(2, 1), question(3, 1), question(4, 1), question(5, 1)];
     const attempts = [
       attempt({ questionId: "2024-1-Q1", isCorrect: true, solvedAt: 100 }),
       attempt({ questionId: "2024-1-Q2", isCorrect: true, solvedAt: 100 }),
-      // Q3~Q5: exam모드 attempt 없음 — study모드로만 이어서 풀었다고 가정, 여기선 attempt 자체를 안 만듦
+      // Q3~Q5: 이 세션에서 exam모드 attempt 없음
     ];
-    const result = scoreExamFromAttempts(fiveQuestions, attempts, "2024-1");
+    const result = scoreExamSession(fiveQuestions, attempts, "2024-1", "session-1");
     expect(result).toEqual({ correct: 2, total: 5, passed: false });
+  });
+
+  it("같은 회차를 다른 세션으로 재응시했을 때, 이전 세션의 attempt는 섞이지 않는다", () => {
+    const attempts = [
+      // 이전 세션: 둘 다 정답
+      attempt({ questionId: "2024-1-Q1", isCorrect: true, solvedAt: 100, sessionId: "session-old" }),
+      attempt({ questionId: "2024-1-Q2", isCorrect: true, solvedAt: 100, sessionId: "session-old" }),
+      // 최신 세션: Q1만 다시 풀어서 오답, Q2는 이번 세션에서 안 건드림
+      attempt({ questionId: "2024-1-Q1", isCorrect: false, solvedAt: 500, sessionId: "session-new" }),
+    ];
+
+    const latest = pickLatestExamSession(attempts);
+    expect(latest).toEqual({ examId: "2024-1", sessionId: "session-new" });
+
+    const result = scoreExamSession(questions, attempts, latest!.examId, latest!.sessionId);
+    // Q2는 최신 세션에서 안 풀었으므로 오답 처리(이전 세션의 정답이 새어들어오면 안 됨)
+    expect(result).toEqual({ correct: 0, total: 2, passed: false });
   });
 });
