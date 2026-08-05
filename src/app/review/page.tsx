@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ReviewList } from "@/features/review/ReviewList";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
+import { pickRandomQuestions } from "@/lib/sampling";
 import type { WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
@@ -151,9 +152,13 @@ export default function ReviewPage() {
         questionRepository.getTheoryMap(),
         settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS),
       ]);
+      const orderedQuestions =
+        settings.reviewOrder === "random"
+          ? pickRandomQuestions(selectedQuestions, selectedQuestions.length)
+          : selectedQuestions;
       setPhase({
         kind: "active",
-        questions: selectedQuestions,
+        questions: orderedQuestions,
         theoryMap,
         autoSaveWrongNotes: settings.autoSaveWrongNotes,
       });

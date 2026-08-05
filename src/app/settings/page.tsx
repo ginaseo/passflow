@@ -5,7 +5,7 @@ import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { parseBackup, serializeBackup } from "@/lib/backup";
 import { isStorageFallbackActive } from "@/repositories/storageFallback";
-import { DEFAULT_SETTINGS, type Settings, type TimeoutBehavior } from "@/types/settings";
+import { DEFAULT_SETTINGS, type ReviewOrder, type Settings, type TimeoutBehavior } from "@/types/settings";
 import type { Mode } from "@/types/progress";
 
 const settingsRepository = new IndexedDbSettingsRepository();
@@ -172,6 +172,23 @@ export default function SettingsPage() {
         <p className="text-xs text-gray-400">
           ※ 값만 저장됨 — 시험모드 화면이 추가되면 자동 적용된다.
         </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium">복습 다시풀기 순서</span>
+        <div className="flex gap-2">
+          {(["sequential", "random"] as ReviewOrder[]).map((order) => (
+            <button
+              key={order}
+              type="button"
+              aria-pressed={settings.reviewOrder === order}
+              onClick={() => update({ ...settings, reviewOrder: order })}
+              className={`px-3 py-1.5 rounded border ${settings.reviewOrder === order ? "bg-black text-white" : ""}`}
+            >
+              {order === "sequential" ? "순차" : "랜덤"}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

@@ -115,6 +115,38 @@ describe("parseBackup", () => {
     expect(parseBackup(json)).toBeNull();
   });
 
+  it("reviewOrder 필드가 없는 구버전 백업의 settings는 거부하지 않고 sequential로 채워서 통과시킨다", () => {
+    const legacySettings: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+    delete legacySettings.reviewOrder;
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: legacySettings,
+    });
+
+    const backup = parseBackup(json);
+
+    expect(backup).not.toBeNull();
+    expect(backup?.settings.reviewOrder).toBe("sequential");
+  });
+
+  it("settings의 reviewOrder 값이 유효하지 않으면 null을 반환한다", () => {
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: { ...DEFAULT_SETTINGS, reviewOrder: "shuffle" },
+    });
+    expect(parseBackup(json)).toBeNull();
+  });
+
   it("attempts 원소에 id 필드가 섞여 있어도 결과에서 제거된다", () => {
     const json = JSON.stringify({
       version: BACKUP_VERSION,

@@ -64,10 +64,10 @@ export class IndexedDbSettingsRepository implements SettingsRepository {
       await reconcileIfNeeded(db);
       deactivateIfFullyRecovered();
       const existing = await db.get("settings", SETTINGS_KEY);
-      return existing ?? DEFAULT_SETTINGS;
+      return existing ? { ...DEFAULT_SETTINGS, ...existing } : DEFAULT_SETTINGS;
     } catch {
       noteFallbackTriggered();
-      return readLocalStorage(SETTINGS_FALLBACK_KEY, DEFAULT_SETTINGS);
+      return { ...DEFAULT_SETTINGS, ...readLocalStorage(SETTINGS_FALLBACK_KEY, DEFAULT_SETTINGS) };
     }
   }
 
