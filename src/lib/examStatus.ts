@@ -28,3 +28,20 @@ export function computeExamStatuses(
   }
   return result;
 }
+
+export function pickMostRecentlyTouchedExam(examIds: string[], attempts: Attempt[]): string | null {
+  let latestExamId: string | null = null;
+  let latestSolvedAt = -Infinity;
+
+  for (const examId of examIds) {
+    const maxSolvedAt = attempts
+      .filter((a) => parseQuestionId(a.questionId).examId === examId)
+      .reduce((max, a) => Math.max(max, a.solvedAt), -Infinity);
+    if (maxSolvedAt > latestSolvedAt) {
+      latestSolvedAt = maxSolvedAt;
+      latestExamId = examId;
+    }
+  }
+
+  return latestExamId;
+}
