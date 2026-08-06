@@ -50,4 +50,8 @@ next-env.d.ts
 /.superpowers/
 
 # 계획 문서 — 로컬 작업용, repo엔 안 넣는다
-/docs/superpowers/
+/docs/
+
+# 로컬 Claude Code 설정/훅/worktree — devkit 플러그인이 이미 제공(중복), 개인 실행상태
+/.claude/
+/CLAUDE.md
