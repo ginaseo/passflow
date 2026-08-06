@@ -20,6 +20,9 @@ interface PracticeSessionProps {
   timeLimitMs: number | null;
   autoSaveWrongNotes: boolean;
   onFinish: (summary: SessionSummary) => void;
+  initialAnswers?: Record<number, number>;
+  initialSessionId?: string;
+  initialSessionStartedAt?: number;
 }
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -32,14 +35,17 @@ export function PracticeSession({
   timeLimitMs,
   autoSaveWrongNotes,
   onFinish,
+  initialAnswers,
+  initialSessionId,
+  initialSessionStartedAt,
 }: PracticeSessionProps) {
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [answers, setAnswers] = useState<Record<number, number>>(() => initialAnswers ?? {});
   const [favorited, setFavorited] = useState<Record<number, boolean>>({});
   const [questionStartedAt, setQuestionStartedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
-  const [sessionStartedAt] = useState(() => Date.now());
-  const [sessionId] = useState(() => `session-${crypto.randomUUID()}`);
+  const [sessionStartedAt] = useState(() => initialSessionStartedAt ?? Date.now());
+  const [sessionId] = useState(() => initialSessionId ?? `session-${crypto.randomUUID()}`);
   const finishedRef = useRef(false);
   const [showGrid, setShowGrid] = useState(false);
 
@@ -91,6 +97,7 @@ export function PracticeSession({
           isCorrect,
           solveTimeMs: Date.now() - questionStartedAt,
           sessionId,
+          timeLimitMs,
         })
         .catch((err) => console.error("recordAttempt failed:", err));
 
@@ -100,8 +107,26 @@ export function PracticeSession({
           .catch((err) => console.error("addWrongNote failed:", err));
       }
     } else {
-      // 시험모드는 답을 자유롭게 바꿀 수 있고, 실제 채점·기록은 제출 시점(submitExam)에 한 번에 한다.
+      // 시험모드는 답을 자유롭게 바꿀 수 있다 — 고를 때마다 즉시 기록해서 중간 이탈(새로고침 등)에도
+      // 유실되지 않게 하되, 재선택 시엔 매번 새 attempt를 추가한다(덮어쓰지 않음). scoreExamSession이
+      // 세션 내 같은 문항에 대해 이미 "가장 늦은 solvedAt 우선"으로 채점하므로 별도 로직 없이 정확하다.
+      // 제출 시점의 submitExam() 일괄 기록은 그대로 남겨서 최종 확정값 역할을 한다(항상 가장 늦은
+      // 타임스탬프를 갖게 되므로, 연타로 인한 저장 순서 레이스가 있어도 결국 이 값이 채점에 반영된다).
       setAnswers((prev) => ({ ...prev, [current]: answer }));
+      const isCorrect = gradeAnswer(question, answer);
+      progressRepository
+        .recordAttempt({
+          questionId: question.questionId,
+          solvedAt: Date.now(),
+          mode,
+          entryType,
+          selectedAnswer: answer,
+          isCorrect,
+          solveTimeMs: Date.now() - questionStartedAt,
+          sessionId,
+          timeLimitMs,
+        })
+        .catch((err) => console.error("recordAttempt failed:", err));
     }
   }
 
@@ -136,6 +161,7 @@ export function PracticeSession({
           isCorrect,
           solveTimeMs: avgSolveTimeMs,
           sessionId,
+          timeLimitMs,
         })
         .catch((err) => console.error("recordAttempt failed:", err));
 
