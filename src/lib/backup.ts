@@ -32,6 +32,7 @@ export function serializeBackup(data: {
       isCorrect: a.isCorrect,
       solveTimeMs: a.solveTimeMs,
       sessionId: a.sessionId,
+      timeLimitMs: a.timeLimitMs,
     })),
     questionStats: data.questionStats,
     wrongNotes: data.wrongNotes,
@@ -81,7 +82,8 @@ function normalizeAttempt(value: unknown): Omit<Attempt, "id"> | null {
     !isFiniteNumber(a.selectedAnswer) ||
     typeof a.isCorrect !== "boolean" ||
     !isFiniteNumber(a.solveTimeMs) ||
-    typeof a.sessionId !== "string"
+    typeof a.sessionId !== "string" ||
+    (a.timeLimitMs !== undefined && a.timeLimitMs !== null && !isFiniteNumber(a.timeLimitMs))
   ) {
     return null;
   }
@@ -94,6 +96,7 @@ function normalizeAttempt(value: unknown): Omit<Attempt, "id"> | null {
     isCorrect: a.isCorrect,
     solveTimeMs: a.solveTimeMs,
     sessionId: a.sessionId,
+    timeLimitMs: isFiniteNumber(a.timeLimitMs) ? a.timeLimitMs : null,
   };
 }
 
