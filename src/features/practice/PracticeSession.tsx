@@ -107,10 +107,16 @@ export function PracticeSession({
           .addWrongNote(question.questionId, mode)
           .catch((err) => console.error("addWrongNote failed:", err));
       } else if (isCorrect) {
-        // 이전에 어떤 모드로든 틀려서 오답노트에 남아있었다면, 맞혔으니 지운다 —
-        // 그래야 오답노트/회차별 오답 집계가 "현재도 틀린 문항"만 반영한다.
+        // study 모드에서 맞히면 지우되, 그 노트가 시험모드 회차에서 틀려 남은 것이면
+        // 지우지 않는다 — 그건 "그 회차 응시 당시의 고정 기록"이라 나중에 복습에서
+        // 맞혔다고 사라지면 안 된다(대시보드 오답 배지와 같은 원칙, #46). study 모드에서
+        // 틀려서 남은 노트만 "지금도 틀리는지"를 반영해 마스터리 추적 용도로 지운다.
         progressRepository
-          .removeWrongNote(question.questionId)
+          .getWrongNote(question.questionId)
+          .then((note) => {
+            if (note && note.mode === "exam") return;
+            return progressRepository.removeWrongNote(question.questionId);
+          })
           .catch((err) => console.error("removeWrongNote failed:", err));
       }
     } else {

@@ -140,6 +140,7 @@ export interface ProgressRepository {
   getQuestionStats(questionId: string): Promise<QuestionStats>;
   getDashboardSummary(): Promise<DashboardSummary>;
   addWrongNote(questionId: string, mode: Mode): Promise<void>;
+  getWrongNote(questionId: string): Promise<WrongNote | null>;
   addFavorite(questionId: string): Promise<void>;
   getWrongNotes(): Promise<WrongNote[]>;
   getFavorites(): Promise<Favorite[]>;
@@ -274,6 +275,18 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       const existing = readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {})[questionId];
       const note: WrongNote = { questionId, addedAt: Date.now(), mode: existing?.mode ?? mode };
       upsertLocalStorageRecord(WRONG_NOTES_KEY, questionId, note);
+    }
+  }
+
+  async getWrongNote(questionId: string): Promise<WrongNote | null> {
+    try {
+      const db = await getDb();
+      await reconcileIfNeeded(db);
+      deactivateIfFullyRecovered();
+      return (await db.get("wrongNotes", questionId)) ?? null;
+    } catch {
+      noteFallbackTriggered();
+      return readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {})[questionId] ?? null;
     }
   }
 
