@@ -39,7 +39,7 @@ export function AnswerGrid({ questions, mode, answers, currentIndex, onJump }: A
             type="button"
             onClick={onJump ? () => onJump(i) : undefined}
             disabled={!onJump}
-            className={`text-[10px] py-0.5 rounded border ${style} ${onJump ? "cursor-pointer" : "cursor-default"}`}
+            className={`min-h-6 min-w-6 text-[10px] py-0.5 rounded border ${style} ${onJump ? "cursor-pointer" : "cursor-default"}`}
           >
             {i + 1}
           </button>
