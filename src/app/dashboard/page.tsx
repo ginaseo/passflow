@@ -1,18 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { listExamSessions, scoreExamSession } from "@/lib/latestExamResult";
 import type { SubjectScore } from "@/lib/summary";
 import { SUBJECT_NAMES } from "@/lib/theory";
-import type { DashboardSummary } from "@/types/progress";
+import { parseQuestionId } from "@/lib/questionId";
+import type { DashboardSummary, WrongNote } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
 const questionRepository = new JsonQuestionRepository();
 
 interface CbtResult {
   sessionId: string;
+  examId: string;
   title: string;
   solvedAt: number;
   correct: number;
@@ -41,6 +44,7 @@ export default function DashboardPage() {
   const [error, setError] = useState(false);
   const [cbtResults, setCbtResults] = useState<CbtResult[] | null>(null);
   const [cbtError, setCbtError] = useState(false);
+  const [examWrongCounts, setExamWrongCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     progressRepository.getDashboardSummary().then(
@@ -49,6 +53,19 @@ export default function DashboardPage() {
         console.error("getDashboardSummary failed:", err);
         setError(true);
       }
+    );
+
+    progressRepository.getWrongNotes().then(
+      (notes: WrongNote[]) => {
+        const counts: Record<string, number> = {};
+        for (const note of notes) {
+          if (note.mode !== "exam") continue;
+          const { examId } = parseQuestionId(note.questionId);
+          counts[examId] = (counts[examId] ?? 0) + 1;
+        }
+        setExamWrongCounts(counts);
+      },
+      (err) => console.error("getWrongNotes failed:", err)
     );
 
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()])
@@ -61,7 +78,7 @@ export default function DashboardPage() {
               if (!exam) return null;
               const questions = await questionRepository.getQuestions({ examId });
               const score = scoreExamSession(questions, attempts, examId, sessionId);
-              return { sessionId, title: exam.title, solvedAt, ...score };
+              return { sessionId, examId, title: exam.title, solvedAt, ...score };
             } catch (err) {
               // 세션 하나 계산이 실패해도(예: 회차 JSON fetch 실패) 나머지는 보여준다.
               console.error(`CBT 세션(${sessionId}) 계산 실패:`, err);
@@ -147,6 +164,14 @@ export default function DashboardPage() {
                   </li>
                 ))}
               </ul>
+              {(examWrongCounts[r.examId] ?? 0) > 0 && (
+                <Link
+                  href={`/review?examId=${encodeURIComponent(r.examId)}&mode=exam`}
+                  className="self-start text-sm text-blue-700 underline"
+                >
+                  오답 다시풀기 ({examWrongCounts[r.examId]}문제)
+                </Link>
+              )}
             </div>
           ))
         )}
