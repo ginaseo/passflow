@@ -7,6 +7,7 @@ import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
 import { tryParseQuestionId } from "@/lib/questionId";
+import { SUBJECT_NAMES } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
@@ -309,20 +310,22 @@ function ReviewContent() {
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
-          metaFor={(id) => {
+          metaFor={(question) => {
+            const id = question.questionId;
             const examId = tryParseQuestionId(id)?.examId;
             const mode = tab === "wrong" ? wrongNotesById.get(id)?.mode : modeById.get(id);
             const modeLabel = mode === "exam" ? "시험모드" : mode === "study" ? "학습모드" : null;
+            const subjectLabel = SUBJECT_NAMES[question.subject];
 
             if (tab === "wrong") {
               const note = wrongNotesById.get(id);
               if (!note) return null;
               const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
-              const rest = [examId, modeLabel].filter(Boolean).join(" · ");
+              const rest = [examId, modeLabel, subjectLabel].filter(Boolean).join(" · ");
               return rest ? `${date} · ${rest}` : date;
             }
-            if (!examId) return modeLabel;
-            return modeLabel ? `${examId} · ${modeLabel}` : examId;
+            const rest = [examId, modeLabel, subjectLabel].filter(Boolean).join(" · ");
+            return rest || null;
           }}
         />
       )}
