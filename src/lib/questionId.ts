@@ -7,10 +7,13 @@ export function parseQuestionId(questionId: string): { examId: string; qnum: num
   if (markerIndex === -1) {
     throw new Error(`잘못된 questionId 형식이다: ${questionId}`);
   }
-  return {
-    examId: questionId.slice(0, markerIndex),
-    qnum: Number(questionId.slice(markerIndex + 2)),
-  };
+  const examId = questionId.slice(0, markerIndex);
+  const qnumPart = questionId.slice(markerIndex + 2);
+  const qnum = Number(qnumPart);
+  if (examId === "" || qnumPart === "" || !Number.isInteger(qnum)) {
+    throw new Error(`잘못된 questionId 형식이다: ${questionId}`);
+  }
+  return { examId, qnum };
 }
 
 // wrongNotes/favorites/attempts는 백업 import로 손상된 questionId가 섞여 들어올 수 있다
