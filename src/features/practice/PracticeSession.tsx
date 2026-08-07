@@ -58,6 +58,10 @@ export function PracticeSession({
   const showFeedback = mode === "study" && selectedAnswer !== null;
   const remaining =
     timeLimitMs !== null ? remainingMs(sessionStartedAt, now, timeLimitMs) : null;
+  // 순서대로 안 풀고 문항현황에서 이리저리 건너뛰며 풀어도, 다 풀었으면 지금 어느
+  // 문항에 있든 종료할 수 있어야 한다 — 마지막 문항에 있을 때만 종료 가능하면
+  // 안 된다.
+  const allAnswered = Object.keys(answers).length === questions.length;
 
   useEffect(() => {
     progressRepository.getFavorites().then(
@@ -114,7 +118,11 @@ export function PracticeSession({
         progressRepository
           .getWrongNote(question.questionId)
           .then((note) => {
-            if (note && note.mode === "exam") return;
+            // note가 null이면 "노트가 원래 없다"와 "조회 실패로 알 수 없다" 둘 다
+            // 해당할 수 있다 — 후자인데 지워버리면 IndexedDB 복구(tombstone reconcile)
+            // 과정에서 실제로 남아있던 시험모드 노트가 삭제될 수 있다. mode가 study임을
+            // 확인했을 때만 지운다(fail-safe: 확실하지 않으면 그대로 둔다).
+            if (note?.mode !== "study") return;
             return progressRepository.removeWrongNote(question.questionId);
           })
           .catch((err) => console.error("removeWrongNote failed:", err));
@@ -204,7 +212,7 @@ export function PracticeSession({
         select(Number(e.key));
       } else if (e.key === " ") {
         e.preventDefault();
-        if (current === questions.length - 1) {
+        if (current === questions.length - 1 || allAnswered) {
           finish();
         } else {
           goTo(current + 1);
@@ -213,6 +221,12 @@ export function PracticeSession({
         goTo(current + 1);
       } else if (e.key === "ArrowLeft") {
         goTo(current - 1);
+      } else if (e.key === "ArrowDown") {
+        // 문항현황이 10칸짜리 그리드라(시험모드에서만 보임) 아래/위는 한 칸이 아니라
+        // 한 행(±10칸) 이동한다. 문항현황이 없는 학습모드는 한 칸씩 이동한다.
+        goTo(current + (mode === "exam" ? 10 : 1));
+      } else if (e.key === "ArrowUp") {
+        goTo(current - (mode === "exam" ? 10 : 1));
       } else if (e.key === "f" || e.key === "F") {
         toggleFavorite();
       }
@@ -259,7 +273,6 @@ export function PracticeSession({
         question={question}
         index={current}
         total={questions.length}
-        mode={mode}
         selectedAnswer={selectedAnswer}
         showFeedback={showFeedback}
         theoryLink={showFeedback ? theoryLink : null}
@@ -277,7 +290,7 @@ export function PracticeSession({
           ← 이전
         </button>
         <span>Space: 다음 · 1~4: 답 선택 · F: 즐겨찾기</span>
-        {current === questions.length - 1 ? (
+        {current === questions.length - 1 || allAnswered ? (
           <button type="button" onClick={finish} className="text-blue-700 font-medium">
             종료
           </button>
