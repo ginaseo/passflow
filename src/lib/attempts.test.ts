@@ -61,4 +61,17 @@ describe("dedupeAttemptsBySession", () => {
     expect(kept).toHaveLength(3);
     expect(removedIds).toEqual([]);
   });
+
+  it("questionId/sessionId에 구분자로 쓰일 법한 문자가 섞여도 서로 다른 쌍을 충돌시키지 않는다", () => {
+    // ("A|B", "C")와 ("A", "B|C")는 단순 문자열 이어붙이기로는 같은 키가 된다 —
+    // 백업 import처럼 신뢰 못 할 questionId/sessionId가 들어올 수 있는 경계에서
+    // 실제로 서로 다른 쌍이 하나로 뭉개지면 안 된다.
+    const attempts = [
+      attempt({ id: 1, questionId: "A|B", sessionId: "C" }),
+      attempt({ id: 2, questionId: "A", sessionId: "B|C" }),
+    ];
+    const { kept, removedIds } = dedupeAttemptsBySession(attempts);
+    expect(kept).toHaveLength(2);
+    expect(removedIds).toEqual([]);
+  });
 });

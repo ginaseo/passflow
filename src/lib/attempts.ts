@@ -12,7 +12,11 @@ export function dedupeAttemptsBySession(attempts: Attempt[]): {
   const bySessionQuestion = new Map<string, Attempt>();
 
   for (const a of attempts) {
-    const key = `${a.questionId}|${a.sessionId}`;
+    // 구분자로 이어붙이면 questionId/sessionId 안에 그 구분자가 들어있는 경우(백업
+    // import처럼 신뢰 못 할 문자열이 들어오는 경계) 서로 다른 쌍이 같은 키로 충돌할
+    // 수 있다 — JSON.stringify는 각 요소를 따옴표+이스케이프로 감싸 위치를 구분하므로
+    // 값 안에 어떤 문자가 있어도 충돌하지 않는다.
+    const key = JSON.stringify([a.questionId, a.sessionId]);
     const existing = bySessionQuestion.get(key);
     if (
       !existing ||
