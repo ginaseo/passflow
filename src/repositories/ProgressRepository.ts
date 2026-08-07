@@ -1,5 +1,6 @@
 import { getDb, invalidateDb } from "./db";
 import { isSameLocalDay } from "@/lib/timer";
+import { dedupeAttemptsBySession } from "@/lib/attempts";
 import type { Attempt, DashboardSummary, Favorite, Mode, QuestionStats, WrongNote } from "@/types/progress";
 import type { Settings } from "@/types/settings";
 import { SETTINGS_KEY, clearSettingsFallback } from "./SettingsRepository";
@@ -19,6 +20,7 @@ const FAVORITES_KEY = "favorites_fallback";
 const WRONG_NOTES_TOMBSTONES_KEY = "wrongnotes_tombstones";
 const FAVORITES_TOMBSTONES_KEY = "favorites_tombstones";
 const RESET_PENDING_KEY = "reset_pending";
+const ATTEMPTS_DEDUPED_KEY = "attempts_deduped_v1";
 
 let reconcilePromise: Promise<void> | null = null;
 
@@ -40,6 +42,43 @@ async function doReconcile(db: Awaited<ReturnType<typeof getDb>>): Promise<void>
     ]);
     await tx.done;
     clearLocalStorage(RESET_PENDING_KEY);
+  }
+
+  // #41 이전 코드는 시험모드 재선택마다 별개 attempt row를 쌓았다 — 그 흔적으로 남은
+  // (questionId, sessionId) 중복 row와, 거기서 비롯된 부풀려진 questionStats를 딱
+  // 한 번만 정리한다(#45). 이후 recordAttempt/importBackup은 스스로 중복을 안 만든다.
+  // attempts/questionStats는 폴백 대상이 아니므로(recordAttempt와 동일한 원칙), 이
+  // 블록이 실패해도 wrongNotes/favorites 쪽 reconcile까지 전역 폴백으로 끌고가지
+  // 않는다 — 플래그가 안 세워지므로 다음 앱 로드 때 다시 시도된다.
+  if (!readLocalStorage(ATTEMPTS_DEDUPED_KEY, false)) {
+    try {
+      const tx = db.transaction(["attempts", "questionStats"], "readwrite");
+      const attemptsStore = tx.objectStore("attempts");
+      const statsStore = tx.objectStore("questionStats");
+
+      const all = await attemptsStore.getAll();
+      const { kept, removedIds } = dedupeAttemptsBySession(all);
+      for (const id of removedIds) await attemptsStore.delete(id);
+
+      const byQuestion = new Map<string, Attempt[]>();
+      for (const a of kept) {
+        const list = byQuestion.get(a.questionId) ?? [];
+        list.push(a);
+        byQuestion.set(a.questionId, list);
+      }
+      await statsStore.clear();
+      for (const [questionId, list] of byQuestion) {
+        const correctCount = list.filter((a) => a.isCorrect).length;
+        const wrongCount = list.length - correctCount;
+        const lastSolvedAt = list.reduce((max, a) => Math.max(max, a.solvedAt), 0);
+        await statsStore.put({ questionId, correctCount, wrongCount, lastSolvedAt });
+      }
+
+      await tx.done;
+      writeLocalStorage(ATTEMPTS_DEDUPED_KEY, true);
+    } catch {
+      // 조용히 건너뛴다 — 위 주석 참고.
+    }
   }
 
   if (hasLocalStorageData(WRONG_NOTES_TOMBSTONES_KEY)) {
@@ -131,10 +170,12 @@ export class IndexedDbProgressRepository implements ProgressRepository {
       const attemptsStore = tx.objectStore("attempts");
 
       // 같은 세션에서 같은 문항을 재선택(시험모드는 답을 자유롭게 바꿀 수 있음)하면
-      // 별개 시도로 또 쌓지 않고 기존 row를 덮어쓴다 — 그래야 questionStats/대시보드
-      // 정답률이 재선택 횟수만큼 부풀려지지 않는다. 다른 세션(다른 날 재풀이)은 그대로 누적.
+      // 별개 시도로 또 쌓지 않는다 — 그래야 questionStats/대시보드 정답률이 재선택
+      // 횟수만큼 부풀려지지 않는다. 다른 세션(다른 날 재풀이)은 그대로 누적.
+      // #41 이전 코드가 만들어둔 구버전 중복 row가 남아있을 수도 있어(#45), 하나가
+      // 아니라 매칭되는 전부를 찾아 지운다 — 이 문항이 다시 손닿을 때 자연스럽게 정리된다.
       const sameQuestion = await attemptsStore.index("questionId").getAll(attempt.questionId);
-      const existingAttempt = sameQuestion.find((a) => a.sessionId === attempt.sessionId);
+      const duplicates = sameQuestion.filter((a) => a.sessionId === attempt.sessionId);
 
       const statsStore = tx.objectStore("questionStats");
       const next: QuestionStats = (await statsStore.get(attempt.questionId)) ?? {
@@ -144,13 +185,12 @@ export class IndexedDbProgressRepository implements ProgressRepository {
         lastSolvedAt: 0,
       };
 
-      if (existingAttempt) {
-        if (existingAttempt.isCorrect) next.correctCount -= 1;
+      for (const dup of duplicates) {
+        if (dup.isCorrect) next.correctCount -= 1;
         else next.wrongCount -= 1;
-        await attemptsStore.put({ ...attempt, id: existingAttempt.id } as Attempt);
-      } else {
-        await attemptsStore.add(attempt as Attempt);
+        await attemptsStore.delete(dup.id!);
       }
+      await attemptsStore.add(attempt as Attempt);
 
       if (attempt.isCorrect) next.correctCount += 1;
       else next.wrongCount += 1;
@@ -370,9 +410,13 @@ export class IndexedDbProgressRepository implements ProgressRepository {
 
     for (const questionId of affectedQuestionIds) {
       const questionAttempts = await attemptsStore.index("questionId").getAll(questionId);
-      const correctCount = questionAttempts.filter((a) => a.isCorrect).length;
-      const wrongCount = questionAttempts.length - correctCount;
-      const lastSolvedAt = questionAttempts.reduce((max, a) => Math.max(max, a.solvedAt), 0);
+      // 가져온 백업 자체가 #41 이전 구버전 데이터를 담고 있을 수 있어(#45), 여기서도
+      // (questionId, sessionId) 중복을 정리한 뒤 통계를 계산한다.
+      const { kept, removedIds } = dedupeAttemptsBySession(questionAttempts);
+      for (const id of removedIds) await attemptsStore.delete(id);
+      const correctCount = kept.filter((a) => a.isCorrect).length;
+      const wrongCount = kept.length - correctCount;
+      const lastSolvedAt = kept.reduce((max, a) => Math.max(max, a.solvedAt), 0);
       await statsStore.put({ questionId, correctCount, wrongCount, lastSolvedAt });
     }
 
