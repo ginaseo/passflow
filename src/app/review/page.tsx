@@ -7,7 +7,7 @@ import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
 import { parseQuestionId } from "@/lib/questionId";
-import type { WrongNote } from "@/types/progress";
+import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
@@ -51,9 +51,18 @@ async function hydrate(questionIds: string[]): Promise<Question[]> {
 
 async function fetchTabQuestions(
   nextTab: Tab
-): Promise<{ questions: Question[]; wrongNotesById: Map<string, WrongNote> }> {
+): Promise<{ questions: Question[]; wrongNotesById: Map<string, WrongNote>; modeById: Map<string, Mode> }> {
   let questionIds: string[];
   let wrongNotesById = new Map<string, WrongNote>();
+
+  // 즐겨찾기/최근 푼 문제 탭에도 "어떤 모드로 풀었는지"를 보여주기 위해 attempts에서
+  // 문항별 가장 최근 mode를 뽑아둔다 — Favorite엔 mode 필드가 아예 없고, 최근 푼 문제는
+  // 여러 mode로 풀렸을 수 있어 가장 최근 시도 기준으로 하나만 고른다.
+  const attempts = await progressRepository.getAttempts();
+  const modeById = new Map<string, Mode>();
+  for (const a of [...attempts].sort((x, y) => x.solvedAt - y.solvedAt)) {
+    modeById.set(a.questionId, a.mode);
+  }
 
   if (nextTab === "wrong") {
     const notes = await progressRepository.getWrongNotes();
@@ -64,12 +73,11 @@ async function fetchTabQuestions(
     const favorites = await progressRepository.getFavorites();
     questionIds = favorites.sort((a, b) => b.addedAt - a.addedAt).map((n) => n.questionId);
   } else {
-    const attempts = await progressRepository.getAttempts();
     questionIds = getAllSolvedQuestionIds(attempts);
   }
 
   const questions = await hydrate(questionIds);
-  return { questions, wrongNotesById };
+  return { questions, wrongNotesById, modeById };
 }
 
 function ReviewContent() {
@@ -77,6 +85,7 @@ function ReviewContent() {
   const [phase, setPhase] = useState<Phase>({ kind: "list" });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [wrongNotesById, setWrongNotesById] = useState<Map<string, WrongNote>>(new Map());
+  const [modeById, setModeById] = useState<Map<string, Mode>>(new Map());
   // `loadedTab` (rather than a `loading` boolean flipped via effect) lets `loading` be
   // derived during render instead of set synchronously inside useEffect, which
   // react-hooks/set-state-in-effect disallows even through an intermediate async call.
@@ -114,10 +123,11 @@ function ReviewContent() {
   function loadTab(nextTab: Tab) {
     const requestId = ++latestRequestId.current;
     fetchTabQuestions(nextTab).then(
-      ({ questions: hydrated, wrongNotesById: notes }) => {
+      ({ questions: hydrated, wrongNotesById: notes, modeById: modes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
         setWrongNotesById(notes);
+        setModeById(modes);
         setLoadedTab(nextTab);
       },
       (err) => {
@@ -125,6 +135,7 @@ function ReviewContent() {
         console.error("loadTab failed:", err);
         setQuestions([]);
         setWrongNotesById(new Map());
+        setModeById(new Map());
         setLoadedTab(nextTab);
       }
     );
@@ -133,10 +144,11 @@ function ReviewContent() {
   useEffect(() => {
     const requestId = ++latestRequestId.current;
     fetchTabQuestions(tab).then(
-      ({ questions: hydrated, wrongNotesById: notes }) => {
+      ({ questions: hydrated, wrongNotesById: notes, modeById: modes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
         setWrongNotesById(notes);
+        setModeById(modes);
         setLoadedTab(tab);
       },
       (err) => {
@@ -144,6 +156,7 @@ function ReviewContent() {
         console.error("loadTab failed:", err);
         setQuestions([]);
         setWrongNotesById(new Map());
+        setModeById(new Map());
         setLoadedTab(tab);
       }
     );
@@ -292,17 +305,19 @@ function ReviewContent() {
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
-          metaFor={
-            tab === "wrong"
-              ? (id) => {
-                  const note = wrongNotesById.get(id);
-                  if (!note) return null;
-                  const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
-                  const modeLabel = note.mode === "exam" ? "시험모드" : note.mode === "study" ? "학습모드" : null;
-                  return modeLabel ? `${date} · ${modeLabel}` : date;
-                }
-              : undefined
-          }
+          metaFor={(id) => {
+            const { examId } = parseQuestionId(id);
+            const mode = tab === "wrong" ? wrongNotesById.get(id)?.mode : modeById.get(id);
+            const modeLabel = mode === "exam" ? "시험모드" : mode === "study" ? "학습모드" : null;
+
+            if (tab === "wrong") {
+              const note = wrongNotesById.get(id);
+              if (!note) return null;
+              const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
+              return modeLabel ? `${date} · ${examId} · ${modeLabel}` : `${date} · ${examId}`;
+            }
+            return modeLabel ? `${examId} · ${modeLabel}` : examId;
+          }}
         />
       )}
     </div>
