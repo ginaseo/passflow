@@ -12,6 +12,7 @@ function attempt(overrides: Partial<Attempt> & { questionId: string }): Attempt 
     isCorrect: true,
     solveTimeMs: 0,
     sessionId: "session-1",
+    timeLimitMs: null,
     ...overrides,
   };
 }

@@ -12,6 +12,7 @@ function makeAttempt(overrides: Partial<Attempt>): Attempt {
     isCorrect: true,
     solveTimeMs: 1000,
     sessionId: "session-1",
+    timeLimitMs: null,
     ...overrides,
   };
 }
