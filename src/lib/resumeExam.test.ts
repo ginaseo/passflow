@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getUnansweredQuestions, pickResumeExamId } from "./resumeExam";
+import { getUnansweredQuestions, pickResumeExamId, pickResumeSession } from "./resumeExam";
 import type { Attempt } from "@/types/progress";
 import type { ExamSummary, Question } from "@/types/question";
 
@@ -17,6 +17,7 @@ function attempt(overrides: Partial<Attempt> & { questionId: string }): Attempt 
     isCorrect: true,
     solveTimeMs: 0,
     sessionId: "session-1",
+    timeLimitMs: null,
     ...overrides,
   };
 }
@@ -70,5 +71,70 @@ describe("getUnansweredQuestions", () => {
     const attempts = [attempt({ questionId: "2024-2-Q1" })];
     const result = getUnansweredQuestions(questions, attempts, "2024-1");
     expect(result.map((q) => q.qnum)).toEqual([1]);
+  });
+});
+
+describe("pickResumeSession", () => {
+  it("해당 회차의 attempt가 없으면 null", () => {
+    expect(pickResumeSession([], "2024-1")).toBeNull();
+  });
+
+  it("가장 최근 sessionId를 골라 그 세션의 mode/entryType/timeLimitMs를 리턴한다", () => {
+    const attempts: Attempt[] = [
+      attempt({ questionId: "2024-1-Q1", sessionId: "old", solvedAt: 1000, mode: "study", timeLimitMs: null }),
+      attempt({
+        questionId: "2024-1-Q1",
+        sessionId: "new",
+        solvedAt: 5000,
+        mode: "exam",
+        entryType: "round",
+        timeLimitMs: 9000000,
+        selectedAnswer: 2,
+      }),
+    ];
+    const result = pickResumeSession(attempts, "2024-1");
+    expect(result).toEqual({
+      sessionId: "new",
+      mode: "exam",
+      entryType: "round",
+      timeLimitMs: 9000000,
+      startedAt: 5000,
+      answersByQnum: { 1: 2 },
+    });
+  });
+
+  it("같은 세션 안 여러 문항의 답을 qnum별로 모은다", () => {
+    const attempts: Attempt[] = [
+      attempt({ questionId: "2024-1-Q1", sessionId: "s1", solvedAt: 1000, selectedAnswer: 1 }),
+      attempt({ questionId: "2024-1-Q2", sessionId: "s1", solvedAt: 2000, selectedAnswer: 3 }),
+    ];
+    const result = pickResumeSession(attempts, "2024-1");
+    expect(result?.answersByQnum).toEqual({ 1: 1, 2: 3 });
+  });
+
+  it("같은 세션 안 같은 문항을 재선택했으면 가장 늦은 답만 남긴다", () => {
+    const attempts: Attempt[] = [
+      attempt({ questionId: "2024-1-Q1", sessionId: "s1", solvedAt: 1000, selectedAnswer: 1 }),
+      attempt({ questionId: "2024-1-Q1", sessionId: "s1", solvedAt: 2000, selectedAnswer: 4 }),
+    ];
+    const result = pickResumeSession(attempts, "2024-1");
+    expect(result?.answersByQnum).toEqual({ 1: 4 });
+  });
+
+  it("startedAt은 그 세션 내 가장 이른 solvedAt이다", () => {
+    const attempts: Attempt[] = [
+      attempt({ questionId: "2024-1-Q1", sessionId: "s1", solvedAt: 3000 }),
+      attempt({ questionId: "2024-1-Q2", sessionId: "s1", solvedAt: 1000 }),
+      attempt({ questionId: "2024-1-Q3", sessionId: "s1", solvedAt: 2000 }),
+    ];
+    const result = pickResumeSession(attempts, "2024-1");
+    expect(result?.startedAt).toBe(1000);
+  });
+
+  it("다른 회차의 attempt는 무시한다", () => {
+    const attempts: Attempt[] = [
+      attempt({ questionId: "2024-2-Q1", sessionId: "s1", solvedAt: 1000 }),
+    ];
+    expect(pickResumeSession(attempts, "2024-1")).toBeNull();
   });
 });
