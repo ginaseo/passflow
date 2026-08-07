@@ -108,7 +108,14 @@ function PracticeContent() {
         // 문항은 애초에 저장된 적이 없다. 이 경우 기존 동작(학습모드, 안 푼 문항만)으로 대체한다.
         // 학습모드는 이 복원 경로를 타면 안 된다 — select()가 이미 답한 문항에서 즉시
         // return하며 정답 피드백이 펼쳐진 채로 나오므로, 시험모드(entryType === "round")에서만 사용한다.
-        if (resumeSession && resumeSession.mode === "exam" && resumeSession.entryType === "round") {
+        // 제한시간이 이미 지난 세션도 제외한다 — 복원하자마자 remaining이 0이라 즉시
+        // 자동제출되는데, submitExam()은 답한 문항만 기록하므로 안 푼 문항은 영원히
+        // 미응시로 남아 "이어서 풀기"를 눌러도 같은 만료 세션을 계속 다시 고르는 루프에 빠진다.
+        const isExpired =
+          resumeSession !== null &&
+          resumeSession.timeLimitMs !== null &&
+          Date.now() - resumeSession.startedAt >= resumeSession.timeLimitMs;
+        if (resumeSession && resumeSession.mode === "exam" && resumeSession.entryType === "round" && !isExpired) {
           const questions = [...pool].sort((a, b) => a.qnum - b.qnum);
           if (questions.length === 0) {
             setPhase({ kind: "error", message: "이어서 풀 문항이 없다." });
