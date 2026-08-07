@@ -195,6 +195,16 @@ describe("IndexedDbProgressRepository", () => {
     expect(await repo.getWrongNotes()).toHaveLength(1);
   });
 
+  it("이미 있는 오답노트를 다른 mode로 다시 addWrongNote해도 최초 mode를 유지한다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.addWrongNote("Q1", "exam");
+    await repo.addWrongNote("Q1", "study");
+
+    const notes = await repo.getWrongNotes();
+    expect(notes).toHaveLength(1);
+    expect(notes[0].mode).toBe("exam");
+  });
+
   it("getDashboardSummary는 오늘/전체 정답률을 계산한다", async () => {
     const repo = new IndexedDbProgressRepository();
     const oneDayMs = 24 * 60 * 60 * 1000;

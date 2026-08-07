@@ -219,14 +219,20 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   }
 
   async addWrongNote(questionId: string, mode: Mode): Promise<void> {
-    const note: WrongNote = { questionId, addedAt: Date.now(), mode };
+    // mode는 "이 문항을 최초로 틀린 모드"를 뜻한다 — 이후 리뷰 탭에서 study 모드로
+    // 다시풀기해서 또 틀려도 여기서 덮어쓰지 않는다. 덮어쓰면 시험모드 회차에서
+    // 틀린 문항이 조용히 study로 재분류돼 대시보드의 회차별 오답 집계가 깨진다.
     try {
       const db = await getDb();
       await reconcileIfNeeded(db);
       deactivateIfFullyRecovered();
+      const existing = await db.get("wrongNotes", questionId);
+      const note: WrongNote = { questionId, addedAt: Date.now(), mode: existing?.mode ?? mode };
       await db.put("wrongNotes", note);
     } catch {
       noteFallbackTriggered();
+      const existing = readLocalStorage<Record<string, WrongNote>>(WRONG_NOTES_KEY, {})[questionId];
+      const note: WrongNote = { questionId, addedAt: Date.now(), mode: existing?.mode ?? mode };
       upsertLocalStorageRecord(WRONG_NOTES_KEY, questionId, note);
     }
   }

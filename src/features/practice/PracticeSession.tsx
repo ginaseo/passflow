@@ -105,6 +105,12 @@ export function PracticeSession({
         progressRepository
           .addWrongNote(question.questionId, mode)
           .catch((err) => console.error("addWrongNote failed:", err));
+      } else if (isCorrect) {
+        // 이전에 어떤 모드로든 틀려서 오답노트에 남아있었다면, 맞혔으니 지운다 —
+        // 그래야 오답노트/회차별 오답 집계가 "현재도 틀린 문항"만 반영한다.
+        progressRepository
+          .removeWrongNote(question.questionId)
+          .catch((err) => console.error("removeWrongNote failed:", err));
       }
     } else {
       // 시험모드는 답을 자유롭게 바꿀 수 있다 — 고를 때마다 즉시 기록해서 중간 이탈(새로고침 등)에도
@@ -126,6 +132,14 @@ export function PracticeSession({
           timeLimitMs,
         })
         .catch((err) => console.error("recordAttempt failed:", err));
+
+      if (isCorrect) {
+        // 재선택으로 정답을 맞혔으면 즉시 지운다 — submitExam()은 최종 오답만 추가할 뿐
+        // 이전에 붙어있던 노트를 지우지는 않는다(자기 담당이 아님).
+        progressRepository
+          .removeWrongNote(question.questionId)
+          .catch((err) => console.error("removeWrongNote failed:", err));
+      }
     }
   }
 
