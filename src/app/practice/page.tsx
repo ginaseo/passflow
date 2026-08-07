@@ -270,12 +270,11 @@ function PracticeContent() {
 
     return (
       <div className="text-center p-10 flex flex-col gap-4 items-center">
-        <p className="text-lg font-medium">수고했다.</p>
         <p className="text-gray-600">
           {total}문제 중 {solved}문제 풀이 — 정답 {correct} · 오답 {wrong}
         </p>
         {showPassFail && (
-          <div className="flex flex-col gap-2 p-4 rounded border max-w-sm w-full">
+          <div className="flex flex-col gap-2 p-3 rounded border w-fit min-w-[240px]">
             <p
               className={`font-medium ${isPassed(subjectScores) ? "text-green-700" : "text-red-700"}`}
             >
@@ -298,7 +297,7 @@ function PracticeContent() {
             onClick={() => retryWrong(wrongQuestions)}
             className="px-4 py-2 rounded border font-medium"
           >
-            틀린·안 푼 문제 다시풀기 ({wrongQuestions.length}문제)
+            오답 문제 다시풀기 ({wrongQuestions.length}문제)
           </button>
         )}
         <button

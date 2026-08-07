@@ -13,7 +13,7 @@ interface AnswerGridProps {
 
 export function AnswerGrid({ questions, mode, answers, currentIndex, onJump }: AnswerGridProps) {
   return (
-    <div className="max-w-xl mx-auto w-full grid grid-cols-10 gap-1 p-2">
+    <div className="max-w-xl mx-auto w-full grid grid-cols-10 gap-0.5 p-2">
       {questions.map((question, i) => {
         const answered = i in answers;
         const isCorrect = answered && gradeAnswer(question, answers[i]);
@@ -39,7 +39,7 @@ export function AnswerGrid({ questions, mode, answers, currentIndex, onJump }: A
             type="button"
             onClick={onJump ? () => onJump(i) : undefined}
             disabled={!onJump}
-            className={`text-xs py-1 rounded border ${style} ${onJump ? "cursor-pointer" : "cursor-default"}`}
+            className={`text-[10px] py-0.5 rounded border ${style} ${onJump ? "cursor-pointer" : "cursor-default"}`}
           >
             {i + 1}
           </button>

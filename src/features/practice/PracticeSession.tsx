@@ -237,6 +237,7 @@ export function PracticeSession({
         question={question}
         index={current}
         total={questions.length}
+        mode={mode}
         selectedAnswer={selectedAnswer}
         showFeedback={showFeedback}
         theoryLink={showFeedback ? theoryLink : null}
