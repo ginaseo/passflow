@@ -31,6 +31,8 @@ describe("IndexedDbProgressRepository — attempts 쓰기 실패가 다른 스�
       isCorrect: true,
       solveTimeMs: 1000,
       sessionId: "session-1",
+      timeLimitMs: null,
+      sessionStartedAt: 1000,
     });
 
     expect(isStorageFallbackActive()).toBe(false);

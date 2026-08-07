@@ -9,7 +9,7 @@ import { pickRandomQuestions, pickStratifiedRandomQuestions } from "@/lib/sampli
 import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
 import { SUBJECT_NAMES } from "@/lib/theory";
-import { getUnansweredQuestions } from "@/lib/resumeExam";
+import { getUnansweredQuestions, pickResumeSession } from "@/lib/resumeExam";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
@@ -33,6 +33,9 @@ type Phase =
       entryType: EntryType;
       timeLimitMs: number | null;
       autoSaveWrongNotes: boolean;
+      initialAnswers?: Record<number, number>;
+      initialSessionId?: string;
+      initialSessionStartedAt?: number;
     }
   | { kind: "done"; summary: SessionSummary; mode: Mode; entryType: EntryType }
   | { kind: "error"; message: string };
@@ -97,6 +100,48 @@ function PracticeContent() {
           settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS),
         ]);
         if (requestId !== latestResumeRequestId.current) return;
+
+        const resumeSession = pickResumeSession(attempts, resumeExamId);
+
+        // entryType이 round가 아니면(random) 원래 문항 집합을 재구성할 방법이 없다 —
+        // 어떤 문항이 원래 뽑혔었는지는 attempt가 기록된 것만 알 수 있고, 안 풀고 넘어간
+        // 문항은 애초에 저장된 적이 없다. 이 경우 기존 동작(학습모드, 안 푼 문항만)으로 대체한다.
+        // 학습모드는 이 복원 경로를 타면 안 된다 — select()가 이미 답한 문항에서 즉시
+        // return하며 정답 피드백이 펼쳐진 채로 나오므로, 시험모드(entryType === "round")에서만 사용한다.
+        // 제한시간이 이미 지난 세션도 제외한다 — 복원하자마자 remaining이 0이라 즉시
+        // 자동제출되는데, submitExam()은 답한 문항만 기록하므로 안 푼 문항은 영원히
+        // 미응시로 남아 "이어서 풀기"를 눌러도 같은 만료 세션을 계속 다시 고르는 루프에 빠진다.
+        const isExpired =
+          resumeSession !== null &&
+          resumeSession.timeLimitMs !== null &&
+          Date.now() - resumeSession.startedAt >= resumeSession.timeLimitMs;
+        if (resumeSession && resumeSession.mode === "exam" && resumeSession.entryType === "round" && !isExpired) {
+          const questions = [...pool].sort((a, b) => a.qnum - b.qnum);
+          if (questions.length === 0) {
+            setPhase({ kind: "error", message: "이어서 풀 문항이 없다." });
+            return;
+          }
+
+          const initialAnswers: Record<number, number> = {};
+          questions.forEach((q, index) => {
+            const answer = resumeSession.answersByQnum[q.qnum];
+            if (answer !== undefined) initialAnswers[index] = answer;
+          });
+
+          setPhase({
+            kind: "active",
+            questions,
+            theoryMap,
+            mode: resumeSession.mode,
+            entryType: "round",
+            timeLimitMs: resumeSession.timeLimitMs,
+            autoSaveWrongNotes: settings.autoSaveWrongNotes,
+            initialAnswers,
+            initialSessionId: resumeSession.sessionId,
+            initialSessionStartedAt: resumeSession.startedAt,
+          });
+          return;
+        }
 
         const questions = getUnansweredQuestions(pool, attempts, resumeExamId).sort(
           (a, b) => a.qnum - b.qnum
@@ -232,12 +277,11 @@ function PracticeContent() {
 
     return (
       <div className="text-center p-10 flex flex-col gap-4 items-center">
-        <p className="text-lg font-medium">수고했다.</p>
         <p className="text-gray-600">
           {total}문제 중 {solved}문제 풀이 — 정답 {correct} · 오답 {wrong}
         </p>
         {showPassFail && (
-          <div className="flex flex-col gap-2 p-4 rounded border max-w-sm w-full">
+          <div className="flex flex-col gap-2 p-3 rounded border w-fit min-w-[240px]">
             <p
               className={`font-medium ${isPassed(subjectScores) ? "text-green-700" : "text-red-700"}`}
             >
@@ -260,7 +304,7 @@ function PracticeContent() {
             onClick={() => retryWrong(wrongQuestions)}
             className="px-4 py-2 rounded border font-medium"
           >
-            틀린·안 푼 문제 다시풀기 ({wrongQuestions.length}문제)
+            오답 문제 다시풀기 ({wrongQuestions.length}문제)
           </button>
         )}
         <button
@@ -282,6 +326,9 @@ function PracticeContent() {
       entryType={phase.entryType}
       timeLimitMs={phase.timeLimitMs}
       autoSaveWrongNotes={phase.autoSaveWrongNotes}
+      initialAnswers={phase.initialAnswers}
+      initialSessionId={phase.initialSessionId}
+      initialSessionStartedAt={phase.initialSessionStartedAt}
       onFinish={(summary) => setPhase({ kind: "done", summary, mode: phase.mode, entryType: phase.entryType })}
     />
   );

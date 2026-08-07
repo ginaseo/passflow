@@ -20,6 +20,9 @@ interface PracticeSessionProps {
   timeLimitMs: number | null;
   autoSaveWrongNotes: boolean;
   onFinish: (summary: SessionSummary) => void;
+  initialAnswers?: Record<number, number>;
+  initialSessionId?: string;
+  initialSessionStartedAt?: number;
 }
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -32,14 +35,17 @@ export function PracticeSession({
   timeLimitMs,
   autoSaveWrongNotes,
   onFinish,
+  initialAnswers,
+  initialSessionId,
+  initialSessionStartedAt,
 }: PracticeSessionProps) {
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [answers, setAnswers] = useState<Record<number, number>>(() => initialAnswers ?? {});
   const [favorited, setFavorited] = useState<Record<number, boolean>>({});
   const [questionStartedAt, setQuestionStartedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
-  const [sessionStartedAt] = useState(() => Date.now());
-  const [sessionId] = useState(() => `session-${crypto.randomUUID()}`);
+  const [sessionStartedAt] = useState(() => initialSessionStartedAt ?? Date.now());
+  const [sessionId] = useState(() => initialSessionId ?? `session-${crypto.randomUUID()}`);
   const finishedRef = useRef(false);
   const [showGrid, setShowGrid] = useState(false);
 
@@ -91,6 +97,8 @@ export function PracticeSession({
           isCorrect,
           solveTimeMs: Date.now() - questionStartedAt,
           sessionId,
+          timeLimitMs,
+          sessionStartedAt,
         })
         .catch((err) => console.error("recordAttempt failed:", err));
 
@@ -98,10 +106,42 @@ export function PracticeSession({
         progressRepository
           .addWrongNote(question.questionId, mode)
           .catch((err) => console.error("addWrongNote failed:", err));
+      } else if (isCorrect) {
+        // 이전에 어떤 모드로든 틀려서 오답노트에 남아있었다면, 맞혔으니 지운다 —
+        // 그래야 오답노트/회차별 오답 집계가 "현재도 틀린 문항"만 반영한다.
+        progressRepository
+          .removeWrongNote(question.questionId)
+          .catch((err) => console.error("removeWrongNote failed:", err));
       }
     } else {
-      // 시험모드는 답을 자유롭게 바꿀 수 있고, 실제 채점·기록은 제출 시점(submitExam)에 한 번에 한다.
+      // 시험모드는 답을 자유롭게 바꿀 수 있다 — 고를 때마다 즉시 기록해서 중간 이탈(새로고침 등)에도
+      // 유실되지 않게 한다. recordAttempt는 (questionId, sessionId) 기준 upsert라 재선택해도
+      // attempts에 중복 row가 쌓이지 않고 questionStats도 부풀려지지 않는다(#41).
+      // submitExam()은 이 즉시기록을 다시 반복 기록하지 않는다 — 여기서 기록한 값이 곧 최종값이다.
       setAnswers((prev) => ({ ...prev, [current]: answer }));
+      const isCorrect = gradeAnswer(question, answer);
+      progressRepository
+        .recordAttempt({
+          questionId: question.questionId,
+          solvedAt: Date.now(),
+          mode,
+          entryType,
+          selectedAnswer: answer,
+          isCorrect,
+          solveTimeMs: Date.now() - questionStartedAt,
+          sessionId,
+          timeLimitMs,
+          sessionStartedAt,
+        })
+        .catch((err) => console.error("recordAttempt failed:", err));
+
+      if (isCorrect) {
+        // 재선택으로 정답을 맞혔으면 즉시 지운다 — submitExam()은 최종 오답만 추가할 뿐
+        // 이전에 붙어있던 노트를 지우지는 않는다(자기 담당이 아님).
+        progressRepository
+          .removeWrongNote(question.questionId)
+          .catch((err) => console.error("removeWrongNote failed:", err));
+      }
     }
   }
 
@@ -115,29 +155,11 @@ export function PracticeSession({
   }
 
   function submitExam() {
-    const answeredCount = Object.keys(answers).length;
-    // ponytail: 시험모드는 문항 재선택이 자유로워 문항별 정확한 풀이시간을 못 잰다.
-    // 전체 소요시간을 답한 문항 수로 균등 분배한다 — 문항별 세부 통계는 Phase 2.
-    const avgSolveTimeMs =
-      answeredCount === 0
-        ? 0
-        : Math.round((Date.now() - sessionStartedAt) / answeredCount);
-
+    // select()가 답을 고를 때마다 이미 recordAttempt로 즉시 기록하므로, 여기서는 다시 기록하지
+    // 않는다 — 반복 기록하면 questionStats의 정답/오답 카운트가 문항당 최소 2배로 부풀려진다.
     for (const [indexStr, answer] of Object.entries(answers)) {
       const q = questions[Number(indexStr)];
       const isCorrect = gradeAnswer(q, answer);
-      progressRepository
-        .recordAttempt({
-          questionId: q.questionId,
-          solvedAt: Date.now(),
-          mode: "exam",
-          entryType,
-          selectedAnswer: answer,
-          isCorrect,
-          solveTimeMs: avgSolveTimeMs,
-          sessionId,
-        })
-        .catch((err) => console.error("recordAttempt failed:", err));
 
       if (!isCorrect) {
         progressRepository
@@ -231,6 +253,7 @@ export function PracticeSession({
         question={question}
         index={current}
         total={questions.length}
+        mode={mode}
         selectedAnswer={selectedAnswer}
         showFeedback={showFeedback}
         theoryLink={showFeedback ? theoryLink : null}

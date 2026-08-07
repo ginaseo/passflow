@@ -14,6 +14,8 @@ function makeAttempt(overrides: Partial<Attempt> = {}): Attempt {
     isCorrect: true,
     solveTimeMs: 500,
     sessionId: "session-1",
+    timeLimitMs: null,
+    sessionStartedAt: 1000,
     ...overrides,
   };
 }
@@ -42,6 +44,8 @@ describe("serializeBackup", () => {
         isCorrect: true,
         solveTimeMs: 500,
         sessionId: "session-1",
+        timeLimitMs: null,
+        sessionStartedAt: 1000,
       },
     ]);
     expect(parsed.questionStats).toEqual(questionStats);
@@ -181,6 +185,60 @@ describe("parseBackup", () => {
 
     expect(backup).not.toBeNull();
     expect(backup?.attempts[0].entryType).toBe("round");
+  });
+
+  it("timeLimitMs 필드가 없는 구버전 백업의 attempt는 거부하지 않고 null로 채워서 통과시킨다", () => {
+    const legacyAttempt: Record<string, unknown> = { ...makeAttempt() };
+    delete legacyAttempt.timeLimitMs;
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [legacyAttempt],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: DEFAULT_SETTINGS,
+    });
+
+    const backup = parseBackup(json);
+
+    expect(backup).not.toBeNull();
+    expect(backup?.attempts[0].timeLimitMs).toBeNull();
+  });
+
+  it("timeLimitMs가 숫자면 그대로 유지한다", () => {
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [{ ...makeAttempt(), timeLimitMs: 9000000 }],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: DEFAULT_SETTINGS,
+    });
+
+    const backup = parseBackup(json);
+
+    expect(backup?.attempts[0].timeLimitMs).toBe(9000000);
+  });
+
+  it("sessionStartedAt 필드가 없는 구버전 백업의 attempt는 거부하지 않고 solvedAt으로 채워서 통과시킨다", () => {
+    const legacyAttempt: Record<string, unknown> = { ...makeAttempt({ solvedAt: 5000 }) };
+    delete legacyAttempt.sessionStartedAt;
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [legacyAttempt],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: DEFAULT_SETTINGS,
+    });
+
+    const backup = parseBackup(json);
+
+    expect(backup).not.toBeNull();
+    expect(backup?.attempts[0].sessionStartedAt).toBe(5000);
   });
 
   it("attempts 원소의 필드 타입이 잘못되면 전체를 null로 거부한다", () => {

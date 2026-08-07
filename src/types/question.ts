@@ -8,6 +8,7 @@ export interface Question {
   answer: number | number[];
   explanation: string;
   image: string | null;
+  table?: string;
   sinagong?: string;
 }
 

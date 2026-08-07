@@ -1,6 +1,8 @@
 "use client";
 
 import { isCorrectOption } from "@/lib/grading";
+import { SUBJECT_NAMES } from "@/lib/theory";
+import type { Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryLink } from "@/types/theory";
 
@@ -8,6 +10,7 @@ interface QuestionCardProps {
   question: Question;
   index: number;
   total: number;
+  mode: Mode;
   selectedAnswer: number | null;
   showFeedback: boolean;
   theoryLink: TheoryLink | null;
@@ -20,6 +23,7 @@ export function QuestionCard({
   question,
   index,
   total,
+  mode,
   selectedAnswer,
   showFeedback,
   theoryLink,
@@ -35,6 +39,7 @@ export function QuestionCard({
       <div className="flex items-center justify-between text-sm text-gray-500">
         <span>
           {index + 1} / {total}
+          {mode === "exam" && ` · ${SUBJECT_NAMES[question.subject]}`}
         </span>
         <button type="button" onClick={onFavorite} className="text-yellow-600">
           {isFavorited ? "★ 즐겨찾기 완료" : "☆ 즐겨찾기"}
@@ -45,6 +50,13 @@ export function QuestionCard({
 
       {question.image && (
         <img src={`/data/${question.image}`} alt="문항 이미지" className="max-w-full rounded border" />
+      )}
+
+      {question.table && (
+        <div
+          className="overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left"
+          dangerouslySetInnerHTML={{ __html: question.table }}
+        />
       )}
 
       <div className="flex flex-col gap-2">

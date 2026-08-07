@@ -19,6 +19,7 @@ interface RawQuestion {
   explanation: string;
   image: string | null;
   sinagong?: string;
+  table?: string;
 }
 
 interface RawExam {
@@ -50,6 +51,7 @@ export class JsonQuestionRepository implements QuestionRepository {
               explanation: q.explanation,
               image: q.image,
               sinagong: q.sinagong,
+              table: q.table,
             })
           )
         )

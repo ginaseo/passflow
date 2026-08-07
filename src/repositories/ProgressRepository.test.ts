@@ -43,6 +43,8 @@ describe("IndexedDbProgressRepository", () => {
       isCorrect: true,
       solveTimeMs: 5000,
       sessionId: "session-1",
+      timeLimitMs: null,
+      sessionStartedAt: 1000,
     });
 
     const attempts = await repo.getAttempts("2023-1-Q1");
@@ -66,14 +68,43 @@ describe("IndexedDbProgressRepository", () => {
       entryType: "round" as const,
       selectedAnswer: 1,
       solveTimeMs: 1000,
+      timeLimitMs: null,
+      sessionStartedAt: 0,
     };
 
     await repo.recordAttempt({ ...base, solvedAt: 1000, isCorrect: true, sessionId: "session-1" });
-    await repo.recordAttempt({ ...base, solvedAt: 2000, isCorrect: false, sessionId: "session-1" });
-    await repo.recordAttempt({ ...base, solvedAt: 3000, isCorrect: true, sessionId: "session-1" });
+    await repo.recordAttempt({ ...base, solvedAt: 2000, isCorrect: false, sessionId: "session-2" });
+    await repo.recordAttempt({ ...base, solvedAt: 3000, isCorrect: true, sessionId: "session-3" });
 
     const stats = await repo.getQuestionStats("2023-1-Q1");
     expect(stats.correctCount).toBe(2);
+    expect(stats.wrongCount).toBe(1);
+    expect(stats.lastSolvedAt).toBe(3000);
+  });
+
+  it("같은 세션에서 같은 문항을 재선택하면 QuestionStats가 중복 집계되지 않는다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    const base = {
+      questionId: "2023-1-Q1",
+      mode: "exam" as const,
+      entryType: "round" as const,
+      solveTimeMs: 1000,
+      timeLimitMs: null,
+      sessionStartedAt: 1000,
+      sessionId: "session-1",
+    };
+
+    await repo.recordAttempt({ ...base, solvedAt: 1000, selectedAnswer: 1, isCorrect: false });
+    await repo.recordAttempt({ ...base, solvedAt: 2000, selectedAnswer: 2, isCorrect: true });
+    await repo.recordAttempt({ ...base, solvedAt: 3000, selectedAnswer: 3, isCorrect: false });
+
+    const attempts = await repo.getAttempts("2023-1-Q1");
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0].selectedAnswer).toBe(3);
+    expect(attempts[0].solvedAt).toBe(3000);
+
+    const stats = await repo.getQuestionStats("2023-1-Q1");
+    expect(stats.correctCount).toBe(0);
     expect(stats.wrongCount).toBe(1);
     expect(stats.lastSolvedAt).toBe(3000);
   });
@@ -142,6 +173,8 @@ describe("IndexedDbProgressRepository", () => {
       isCorrect: true,
       solveTimeMs: 1000,
       sessionId: "session-1",
+      timeLimitMs: null,
+      sessionStartedAt: 1000,
     });
     await repo.addWrongNote("Q1", "study");
     await repo.addFavorite("Q1");
@@ -166,6 +199,16 @@ describe("IndexedDbProgressRepository", () => {
     expect(await repo.getWrongNotes()).toHaveLength(1);
   });
 
+  it("이미 있는 오답노트를 다른 mode로 다시 addWrongNote해도 최초 mode를 유지한다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.addWrongNote("Q1", "exam");
+    await repo.addWrongNote("Q1", "study");
+
+    const notes = await repo.getWrongNotes();
+    expect(notes).toHaveLength(1);
+    expect(notes[0].mode).toBe("exam");
+  });
+
   it("getDashboardSummary는 오늘/전체 정답률을 계산한다", async () => {
     const repo = new IndexedDbProgressRepository();
     const oneDayMs = 24 * 60 * 60 * 1000;
@@ -181,6 +224,8 @@ describe("IndexedDbProgressRepository", () => {
       isCorrect: true,
       solveTimeMs: 1000,
       sessionId: "session-1",
+      timeLimitMs: null,
+      sessionStartedAt: now,
     });
     await repo.recordAttempt({
       questionId: "Q2",
@@ -191,6 +236,8 @@ describe("IndexedDbProgressRepository", () => {
       isCorrect: false,
       solveTimeMs: 1000,
       sessionId: "session-1",
+      timeLimitMs: null,
+      sessionStartedAt: now,
     });
     await repo.recordAttempt({
       questionId: "Q3",
@@ -201,6 +248,8 @@ describe("IndexedDbProgressRepository", () => {
       isCorrect: true,
       solveTimeMs: 1000,
       sessionId: "session-1",
+      timeLimitMs: null,
+      sessionStartedAt: yesterday,
     });
 
     const summary = await repo.getDashboardSummary();
@@ -237,6 +286,8 @@ describe("IndexedDbProgressRepository", () => {
       isCorrect: true,
       solveTimeMs: 100,
       sessionId: "session-old",
+      timeLimitMs: null,
+      sessionStartedAt: 500,
     });
 
     await repo.importBackup({
@@ -250,6 +301,8 @@ describe("IndexedDbProgressRepository", () => {
           isCorrect: false,
           solveTimeMs: 200,
           sessionId: "session-imported",
+          timeLimitMs: null,
+          sessionStartedAt: 1000,
         },
       ],
       wrongNotes: [{ questionId: "q1", addedAt: 9999, mode: "exam" }],
@@ -292,6 +345,8 @@ describe("IndexedDbProgressRepository", () => {
           isCorrect: true,
           solveTimeMs: 100,
           sessionId: "session-a",
+          timeLimitMs: null,
+          sessionStartedAt: 1000,
         },
       ],
       wrongNotes: [],

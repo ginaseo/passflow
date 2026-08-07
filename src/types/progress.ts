@@ -11,6 +11,8 @@ export interface Attempt {
   isCorrect: boolean;
   solveTimeMs: number;
   sessionId: string;
+  timeLimitMs: number | null;
+  sessionStartedAt: number;
 }
 
 export interface QuestionStats {

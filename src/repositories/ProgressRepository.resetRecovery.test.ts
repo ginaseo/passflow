@@ -25,6 +25,8 @@ describe("IndexedDbProgressRepository — resetAll이 IndexedDB clear에 실패�
       isCorrect: true,
       solveTimeMs: 1,
       sessionId: "session-1",
+      timeLimitMs: null,
+      sessionStartedAt: 1,
     });
     await db.put("questionStats", { questionId: "q1", correctCount: 1, wrongCount: 0, lastSolvedAt: 1 });
     await db.put("wrongNotes", { questionId: "q1", addedAt: 1, mode: "study" });

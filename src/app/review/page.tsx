@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ReviewList } from "@/features/review/ReviewList";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
-import type { WrongNote } from "@/types/progress";
+import { tryParseQuestionId } from "@/lib/questionId";
+import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
@@ -49,9 +51,18 @@ async function hydrate(questionIds: string[]): Promise<Question[]> {
 
 async function fetchTabQuestions(
   nextTab: Tab
-): Promise<{ questions: Question[]; wrongNotesById: Map<string, WrongNote> }> {
+): Promise<{ questions: Question[]; wrongNotesById: Map<string, WrongNote>; modeById: Map<string, Mode> }> {
   let questionIds: string[];
   let wrongNotesById = new Map<string, WrongNote>();
+
+  // 즐겨찾기/최근 푼 문제 탭에도 "어떤 모드로 풀었는지"를 보여주기 위해 attempts에서
+  // 문항별 가장 최근 mode를 뽑아둔다 — Favorite엔 mode 필드가 아예 없고, 최근 푼 문제는
+  // 여러 mode로 풀렸을 수 있어 가장 최근 시도 기준으로 하나만 고른다.
+  const attempts = await progressRepository.getAttempts();
+  const modeById = new Map<string, Mode>();
+  for (const a of [...attempts].sort((x, y) => x.solvedAt - y.solvedAt)) {
+    modeById.set(a.questionId, a.mode);
+  }
 
   if (nextTab === "wrong") {
     const notes = await progressRepository.getWrongNotes();
@@ -62,19 +73,19 @@ async function fetchTabQuestions(
     const favorites = await progressRepository.getFavorites();
     questionIds = favorites.sort((a, b) => b.addedAt - a.addedAt).map((n) => n.questionId);
   } else {
-    const attempts = await progressRepository.getAttempts();
     questionIds = getAllSolvedQuestionIds(attempts);
   }
 
   const questions = await hydrate(questionIds);
-  return { questions, wrongNotesById };
+  return { questions, wrongNotesById, modeById };
 }
 
-export default function ReviewPage() {
+function ReviewContent() {
   const [tab, setTab] = useState<Tab>("wrong");
   const [phase, setPhase] = useState<Phase>({ kind: "list" });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [wrongNotesById, setWrongNotesById] = useState<Map<string, WrongNote>>(new Map());
+  const [modeById, setModeById] = useState<Map<string, Mode>>(new Map());
   // `loadedTab` (rather than a `loading` boolean flipped via effect) lets `loading` be
   // derived during render instead of set synchronously inside useEffect, which
   // react-hooks/set-state-in-effect disallows even through an intermediate async call.
@@ -82,16 +93,45 @@ export default function ReviewPage() {
   const latestRequestId = useRef(0);
   const loading = loadedTab !== tab;
 
+  const searchParams = useSearchParams();
+  const [modeFilter, setModeFilter] = useState<"all" | "study" | "exam">(() => {
+    const m = searchParams.get("mode");
+    return m === "study" || m === "exam" ? m : "all";
+  });
+  const [roundFilter, setRoundFilter] = useState<string>(() => searchParams.get("examId") ?? "all");
+
+  const filteredQuestions =
+    tab === "wrong"
+      ? questions.filter((q) => {
+          const note = wrongNotesById.get(q.questionId);
+          if (modeFilter !== "all" && note?.mode !== modeFilter) return false;
+          if (roundFilter !== "all" && tryParseQuestionId(q.questionId)?.examId !== roundFilter) return false;
+          return true;
+        })
+      : questions;
+
+  const availableRounds =
+    tab === "wrong"
+      ? [
+          ...new Set(
+            questions
+              .map((q) => tryParseQuestionId(q.questionId)?.examId)
+              .filter((examId): examId is string => examId !== undefined)
+          ),
+        ].sort((a, b) => b.localeCompare(a))
+      : [];
+
   // Reusable for imperative reloads (e.g. the "복습 목록으로" button) — never referenced
   // from the effect below, since react-hooks/set-state-in-effect flags any effect that
   // captures a function which itself calls a state setter, however deep.
   function loadTab(nextTab: Tab) {
     const requestId = ++latestRequestId.current;
     fetchTabQuestions(nextTab).then(
-      ({ questions: hydrated, wrongNotesById: notes }) => {
+      ({ questions: hydrated, wrongNotesById: notes, modeById: modes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
         setWrongNotesById(notes);
+        setModeById(modes);
         setLoadedTab(nextTab);
       },
       (err) => {
@@ -99,6 +139,7 @@ export default function ReviewPage() {
         console.error("loadTab failed:", err);
         setQuestions([]);
         setWrongNotesById(new Map());
+        setModeById(new Map());
         setLoadedTab(nextTab);
       }
     );
@@ -107,10 +148,11 @@ export default function ReviewPage() {
   useEffect(() => {
     const requestId = ++latestRequestId.current;
     fetchTabQuestions(tab).then(
-      ({ questions: hydrated, wrongNotesById: notes }) => {
+      ({ questions: hydrated, wrongNotesById: notes, modeById: modes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
         setWrongNotesById(notes);
+        setModeById(modes);
         setLoadedTab(tab);
       },
       (err) => {
@@ -118,6 +160,7 @@ export default function ReviewPage() {
         console.error("loadTab failed:", err);
         setQuestions([]);
         setWrongNotesById(new Map());
+        setModeById(new Map());
         setLoadedTab(tab);
       }
     );
@@ -232,27 +275,65 @@ export default function ReviewPage() {
           </button>
         ))}
       </div>
+
+      {tab === "wrong" && (
+        <div className="max-w-xl mx-auto w-full flex gap-2 px-6">
+          <select
+            value={modeFilter}
+            onChange={(e) => setModeFilter(e.target.value as "all" | "study" | "exam")}
+            className="px-2 py-1.5 rounded border text-sm"
+          >
+            <option value="all">전체 모드</option>
+            <option value="study">학습모드</option>
+            <option value="exam">시험모드</option>
+          </select>
+          <select
+            value={roundFilter}
+            onChange={(e) => setRoundFilter(e.target.value)}
+            className="px-2 py-1.5 rounded border text-sm"
+          >
+            <option value="all">전체 회차</option>
+            {availableRounds.map((examId) => (
+              <option key={examId} value={examId}>
+                {examId}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {loading ? (
         <p className="text-center p-10">불러오는 중...</p>
       ) : (
         <ReviewList
-          questions={questions}
+          questions={filteredQuestions}
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
-          metaFor={
-            tab === "wrong"
-              ? (id) => {
-                  const note = wrongNotesById.get(id);
-                  if (!note) return null;
-                  const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
-                  const modeLabel = note.mode === "exam" ? "시험모드" : note.mode === "study" ? "학습모드" : null;
-                  return modeLabel ? `${date} · ${modeLabel}` : date;
-                }
-              : undefined
-          }
+          metaFor={(id) => {
+            const examId = tryParseQuestionId(id)?.examId;
+            const mode = tab === "wrong" ? wrongNotesById.get(id)?.mode : modeById.get(id);
+            const modeLabel = mode === "exam" ? "시험모드" : mode === "study" ? "학습모드" : null;
+
+            if (tab === "wrong") {
+              const note = wrongNotesById.get(id);
+              if (!note) return null;
+              const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
+              const rest = [examId, modeLabel].filter(Boolean).join(" · ");
+              return rest ? `${date} · ${rest}` : date;
+            }
+            if (!examId) return modeLabel;
+            return modeLabel ? `${examId} · ${modeLabel}` : examId;
+          }}
         />
       )}
     </div>
+  );
+}
+
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={<p className="text-center p-10">불러오는 중...</p>}>
+      <ReviewContent />
+    </Suspense>
   );
 }

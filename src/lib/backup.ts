@@ -32,6 +32,8 @@ export function serializeBackup(data: {
       isCorrect: a.isCorrect,
       solveTimeMs: a.solveTimeMs,
       sessionId: a.sessionId,
+      timeLimitMs: a.timeLimitMs,
+      sessionStartedAt: a.sessionStartedAt,
     })),
     questionStats: data.questionStats,
     wrongNotes: data.wrongNotes,
@@ -71,6 +73,11 @@ function isFiniteNumber(value: unknown): value is number {
 // 아예 없을 수 있다 — 없거나 값이 유효하지 않으면 그 attempt 전체를 거부하는 대신
 // "round"로 채워 넣는다. 이 앱에서 시험모드+랜덤 조합이 실사용된 이력이 없어
 // round가 안전한 기본값이다.
+//
+// sessionStartedAt도 같은 이유로 없을 수 있다(#44 이전 백업) — 없으면 그 attempt
+// 자신의 solvedAt으로 채운다. 실제 세션 시작 시각보다 늦을 수 있지만(첫 문항 고민
+// 시간을 못 살림), pickResumeSession이 세션 내 여러 attempt 중 가장 이른 값을
+// 쓰므로 완전히 틀린 값은 아니다 — #44 이전의 근사 방식과 동일한 하한선이다.
 function normalizeAttempt(value: unknown): Omit<Attempt, "id"> | null {
   if (typeof value !== "object" || value === null) return null;
   const a = value as Record<string, unknown>;
@@ -81,7 +88,9 @@ function normalizeAttempt(value: unknown): Omit<Attempt, "id"> | null {
     !isFiniteNumber(a.selectedAnswer) ||
     typeof a.isCorrect !== "boolean" ||
     !isFiniteNumber(a.solveTimeMs) ||
-    typeof a.sessionId !== "string"
+    typeof a.sessionId !== "string" ||
+    (a.timeLimitMs !== undefined && a.timeLimitMs !== null && !isFiniteNumber(a.timeLimitMs)) ||
+    (a.sessionStartedAt !== undefined && !isFiniteNumber(a.sessionStartedAt))
   ) {
     return null;
   }
@@ -94,6 +103,8 @@ function normalizeAttempt(value: unknown): Omit<Attempt, "id"> | null {
     isCorrect: a.isCorrect,
     solveTimeMs: a.solveTimeMs,
     sessionId: a.sessionId,
+    timeLimitMs: isFiniteNumber(a.timeLimitMs) ? a.timeLimitMs : null,
+    sessionStartedAt: isFiniteNumber(a.sessionStartedAt) ? a.sessionStartedAt : a.solvedAt,
   };
 }
 
