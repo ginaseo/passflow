@@ -47,6 +47,13 @@ export function QuestionCard({
         <img src={`/data/${question.image}`} alt="문항 이미지" className="max-w-full rounded border" />
       )}
 
+      {question.table && (
+        <div
+          className="overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left"
+          dangerouslySetInnerHTML={{ __html: question.table }}
+        />
+      )}
+
       <div className="flex flex-col gap-2">
         {question.options.map((option, i) => {
           const optionNumber = i + 1;
