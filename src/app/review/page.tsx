@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ReviewList } from "@/features/review/ReviewList";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
+import { parseQuestionId } from "@/lib/questionId";
 import type { WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
@@ -70,7 +72,7 @@ async function fetchTabQuestions(
   return { questions, wrongNotesById };
 }
 
-export default function ReviewPage() {
+function ReviewContent() {
   const [tab, setTab] = useState<Tab>("wrong");
   const [phase, setPhase] = useState<Phase>({ kind: "list" });
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -81,6 +83,30 @@ export default function ReviewPage() {
   const [loadedTab, setLoadedTab] = useState<Tab | null>(null);
   const latestRequestId = useRef(0);
   const loading = loadedTab !== tab;
+
+  const searchParams = useSearchParams();
+  const [modeFilter, setModeFilter] = useState<"all" | "study" | "exam">(() => {
+    const m = searchParams.get("mode");
+    return m === "study" || m === "exam" ? m : "all";
+  });
+  const [roundFilter, setRoundFilter] = useState<string>(() => searchParams.get("examId") ?? "all");
+
+  const filteredQuestions =
+    tab === "wrong"
+      ? questions.filter((q) => {
+          const note = wrongNotesById.get(q.questionId);
+          if (modeFilter !== "all" && note?.mode !== modeFilter) return false;
+          if (roundFilter !== "all" && parseQuestionId(q.questionId).examId !== roundFilter) return false;
+          return true;
+        })
+      : questions;
+
+  const availableRounds =
+    tab === "wrong"
+      ? [...new Set(questions.map((q) => parseQuestionId(q.questionId).examId))].sort((a, b) =>
+          b.localeCompare(a)
+        )
+      : [];
 
   // Reusable for imperative reloads (e.g. the "복습 목록으로" button) — never referenced
   // from the effect below, since react-hooks/set-state-in-effect flags any effect that
@@ -232,11 +258,37 @@ export default function ReviewPage() {
           </button>
         ))}
       </div>
+
+      {tab === "wrong" && (
+        <div className="max-w-xl mx-auto w-full flex gap-2 px-6">
+          <select
+            value={modeFilter}
+            onChange={(e) => setModeFilter(e.target.value as "all" | "study" | "exam")}
+            className="px-2 py-1.5 rounded border text-sm"
+          >
+            <option value="all">전체 모드</option>
+            <option value="study">학습모드</option>
+            <option value="exam">시험모드</option>
+          </select>
+          <select
+            value={roundFilter}
+            onChange={(e) => setRoundFilter(e.target.value)}
+            className="px-2 py-1.5 rounded border text-sm"
+          >
+            <option value="all">전체 회차</option>
+            {availableRounds.map((examId) => (
+              <option key={examId} value={examId}>
+                {examId}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {loading ? (
         <p className="text-center p-10">불러오는 중...</p>
       ) : (
         <ReviewList
-          questions={questions}
+          questions={filteredQuestions}
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
@@ -254,5 +306,13 @@ export default function ReviewPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function ReviewPage() {
+  return (
+    <Suspense fallback={<p className="text-center p-10">불러오는 중...</p>}>
+      <ReviewContent />
+    </Suspense>
   );
 }
