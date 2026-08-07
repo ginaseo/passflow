@@ -39,12 +39,48 @@ function formatDateTime(ts: number): string {
   });
 }
 
+function CbtCard({ result: r, wrongCount }: { result: CbtResult; wrongCount: number }) {
+  return (
+    <div className="p-4 rounded border flex flex-col gap-2">
+      <div className="flex justify-between items-baseline">
+        <span className="font-medium">{r.title}</span>
+        <span className="text-xs text-gray-400">{formatDateTime(r.solvedAt)}</span>
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl font-bold">{Math.round((r.correct / r.total) * 100)}점</span>
+        <span className={r.passed ? "text-green-700" : "text-red-700"}>
+          {r.passed ? "합격" : "불합격"}
+        </span>
+        {r.solved < r.total && (
+          <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600">미완료</span>
+        )}
+      </div>
+      <ul className="text-sm text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
+        {r.subjectScores.map((s) => (
+          <li key={s.subject}>
+            {SUBJECT_NAMES[s.subject]}: {s.correct}/{s.total}
+          </li>
+        ))}
+      </ul>
+      {wrongCount > 0 && (
+        <Link
+          href={`/review?examId=${encodeURIComponent(r.examId)}&mode=exam`}
+          className="self-start text-sm text-blue-700 underline"
+        >
+          오답 다시풀기 ({wrongCount}문제)
+        </Link>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [cbtResults, setCbtResults] = useState<CbtResult[] | null>(null);
   const [cbtError, setCbtError] = useState(false);
   const [examWrongCounts, setExamWrongCounts] = useState<Record<string, number>>({});
+  const [showAllCbt, setShowAllCbt] = useState(false);
 
   useEffect(() => {
     progressRepository.getDashboardSummary().then(
@@ -138,42 +174,28 @@ export default function DashboardPage() {
         ) : cbtResults.length === 0 ? (
           <p className="text-sm text-gray-500">아직 시험모드로 회차 전체를 응시한 기록이 없다.</p>
         ) : (
-          cbtResults.map((r) => (
-            <div key={r.sessionId} className="p-4 rounded border flex flex-col gap-2">
-              <div className="flex justify-between items-baseline">
-                <span className="font-medium">{r.title}</span>
-                <span className="text-xs text-gray-400">{formatDateTime(r.solvedAt)}</span>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold">
-                  {Math.round((r.correct / r.total) * 100)}점
-                </span>
-                <span className={r.passed ? "text-green-700" : "text-red-700"}>
-                  {r.passed ? "합격" : "불합격"}
-                </span>
-                {r.solved < r.total && (
-                  <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-600">
-                    미완료
-                  </span>
-                )}
-              </div>
-              <ul className="text-sm text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
-                {r.subjectScores.map((s) => (
-                  <li key={s.subject}>
-                    {SUBJECT_NAMES[s.subject]}: {s.correct}/{s.total}
-                  </li>
-                ))}
-              </ul>
-              {(examWrongCounts[r.examId] ?? 0) > 0 && (
-                <Link
-                  href={`/review?examId=${encodeURIComponent(r.examId)}&mode=exam`}
-                  className="self-start text-sm text-blue-700 underline"
+          <>
+            {cbtResults.slice(0, 3).map((r) => (
+              <CbtCard key={r.sessionId} result={r} wrongCount={examWrongCounts[r.examId] ?? 0} />
+            ))}
+            {cbtResults.length > 3 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowAllCbt((prev) => !prev)}
+                  className="self-start text-sm text-gray-500 underline"
                 >
-                  오답 다시풀기 ({examWrongCounts[r.examId]}문제)
-                </Link>
-              )}
-            </div>
-          ))
+                  {showAllCbt ? "접기" : `이전 기록 더보기 (${cbtResults.length - 3}개)`}
+                </button>
+                {showAllCbt &&
+                  cbtResults
+                    .slice(3)
+                    .map((r) => (
+                      <CbtCard key={r.sessionId} result={r} wrongCount={examWrongCounts[r.examId] ?? 0} />
+                    ))}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
