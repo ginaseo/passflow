@@ -12,6 +12,7 @@ export interface Attempt {
   solveTimeMs: number;
   sessionId: string;
   timeLimitMs: number | null;
+  sessionStartedAt: number;
 }
 
 export interface QuestionStats {

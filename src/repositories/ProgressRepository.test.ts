@@ -44,6 +44,7 @@ describe("IndexedDbProgressRepository", () => {
       solveTimeMs: 5000,
       sessionId: "session-1",
       timeLimitMs: null,
+      sessionStartedAt: 1000,
     });
 
     const attempts = await repo.getAttempts("2023-1-Q1");
@@ -68,6 +69,7 @@ describe("IndexedDbProgressRepository", () => {
       selectedAnswer: 1,
       solveTimeMs: 1000,
       timeLimitMs: null,
+      sessionStartedAt: 0,
     };
 
     await repo.recordAttempt({ ...base, solvedAt: 1000, isCorrect: true, sessionId: "session-1" });
@@ -88,6 +90,7 @@ describe("IndexedDbProgressRepository", () => {
       entryType: "round" as const,
       solveTimeMs: 1000,
       timeLimitMs: null,
+      sessionStartedAt: 1000,
       sessionId: "session-1",
     };
 
@@ -171,6 +174,7 @@ describe("IndexedDbProgressRepository", () => {
       solveTimeMs: 1000,
       sessionId: "session-1",
       timeLimitMs: null,
+      sessionStartedAt: 1000,
     });
     await repo.addWrongNote("Q1", "study");
     await repo.addFavorite("Q1");
@@ -221,6 +225,7 @@ describe("IndexedDbProgressRepository", () => {
       solveTimeMs: 1000,
       sessionId: "session-1",
       timeLimitMs: null,
+      sessionStartedAt: now,
     });
     await repo.recordAttempt({
       questionId: "Q2",
@@ -232,6 +237,7 @@ describe("IndexedDbProgressRepository", () => {
       solveTimeMs: 1000,
       sessionId: "session-1",
       timeLimitMs: null,
+      sessionStartedAt: now,
     });
     await repo.recordAttempt({
       questionId: "Q3",
@@ -243,6 +249,7 @@ describe("IndexedDbProgressRepository", () => {
       solveTimeMs: 1000,
       sessionId: "session-1",
       timeLimitMs: null,
+      sessionStartedAt: yesterday,
     });
 
     const summary = await repo.getDashboardSummary();
@@ -280,6 +287,7 @@ describe("IndexedDbProgressRepository", () => {
       solveTimeMs: 100,
       sessionId: "session-old",
       timeLimitMs: null,
+      sessionStartedAt: 500,
     });
 
     await repo.importBackup({
@@ -294,6 +302,7 @@ describe("IndexedDbProgressRepository", () => {
           solveTimeMs: 200,
           sessionId: "session-imported",
           timeLimitMs: null,
+          sessionStartedAt: 1000,
         },
       ],
       wrongNotes: [{ questionId: "q1", addedAt: 9999, mode: "exam" }],
@@ -337,6 +346,7 @@ describe("IndexedDbProgressRepository", () => {
           solveTimeMs: 100,
           sessionId: "session-a",
           timeLimitMs: null,
+          sessionStartedAt: 1000,
         },
       ],
       wrongNotes: [],

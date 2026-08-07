@@ -29,6 +29,7 @@ describe("IndexedDbProgressRepository — importBackup과 대기중인 RESET_PEN
       solveTimeMs: 1,
       sessionId: "session-stale",
       timeLimitMs: null,
+      sessionStartedAt: 1,
     });
 
     const repo = new IndexedDbProgressRepository();
@@ -44,6 +45,7 @@ describe("IndexedDbProgressRepository — importBackup과 대기중인 RESET_PEN
           solveTimeMs: 100,
           sessionId: "session-import",
           timeLimitMs: null,
+          sessionStartedAt: 1000,
         },
       ],
       wrongNotes: [],

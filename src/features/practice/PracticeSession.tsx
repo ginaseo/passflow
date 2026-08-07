@@ -98,6 +98,7 @@ export function PracticeSession({
           solveTimeMs: Date.now() - questionStartedAt,
           sessionId,
           timeLimitMs,
+          sessionStartedAt,
         })
         .catch((err) => console.error("recordAttempt failed:", err));
 
@@ -130,6 +131,7 @@ export function PracticeSession({
           solveTimeMs: Date.now() - questionStartedAt,
           sessionId,
           timeLimitMs,
+          sessionStartedAt,
         })
         .catch((err) => console.error("recordAttempt failed:", err));
 

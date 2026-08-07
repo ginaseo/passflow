@@ -23,6 +23,7 @@ function legacyAttempt(overrides: Partial<Omit<Attempt, "id">>): Omit<Attempt, "
     solveTimeMs: 1000,
     sessionId: "session-1",
     timeLimitMs: null,
+    sessionStartedAt: 1000,
     ...overrides,
   };
 }

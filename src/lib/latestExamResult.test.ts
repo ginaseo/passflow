@@ -13,6 +13,7 @@ function attempt(overrides: Partial<Attempt> & { questionId: string }): Attempt 
     solveTimeMs: 0,
     sessionId: "session-1",
     timeLimitMs: null,
+    sessionStartedAt: 0,
     ...overrides,
   };
 }

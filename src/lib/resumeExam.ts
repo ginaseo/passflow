@@ -43,10 +43,14 @@ export function pickResumeSession(attempts: Attempt[], examId: string): ResumeSe
   }
   const sessionAttempts = relevant.filter((a) => a.sessionId === latest.sessionId);
 
-  let startedAt = sessionAttempts[0].solvedAt;
+  // sessionStartedAt은 실제 세션 시작 시각(문제 화면이 뜬 순간)이다 — 없는 구버전
+  // 데이터(#44 이전)는 그 attempt의 solvedAt으로 근사한다(첫 문항 고민 시간은 못
+  // 살리지만, #44 이전엔 이게 최선의 근사였다).
+  let startedAt = sessionAttempts[0].sessionStartedAt ?? sessionAttempts[0].solvedAt;
   const byQnum = new Map<number, Attempt>();
   for (const a of sessionAttempts) {
-    if (a.solvedAt < startedAt) startedAt = a.solvedAt;
+    const candidateStart = a.sessionStartedAt ?? a.solvedAt;
+    if (candidateStart < startedAt) startedAt = candidateStart;
     const { qnum } = parseQuestionId(a.questionId);
     const prev = byQnum.get(qnum);
     if (!prev || a.solvedAt > prev.solvedAt) byQnum.set(qnum, a);

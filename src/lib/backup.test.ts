@@ -15,6 +15,7 @@ function makeAttempt(overrides: Partial<Attempt> = {}): Attempt {
     solveTimeMs: 500,
     sessionId: "session-1",
     timeLimitMs: null,
+    sessionStartedAt: 1000,
     ...overrides,
   };
 }
@@ -44,6 +45,7 @@ describe("serializeBackup", () => {
         solveTimeMs: 500,
         sessionId: "session-1",
         timeLimitMs: null,
+        sessionStartedAt: 1000,
       },
     ]);
     expect(parsed.questionStats).toEqual(questionStats);
@@ -218,6 +220,25 @@ describe("parseBackup", () => {
     const backup = parseBackup(json);
 
     expect(backup?.attempts[0].timeLimitMs).toBe(9000000);
+  });
+
+  it("sessionStartedAt 필드가 없는 구버전 백업의 attempt는 거부하지 않고 solvedAt으로 채워서 통과시킨다", () => {
+    const legacyAttempt: Record<string, unknown> = { ...makeAttempt({ solvedAt: 5000 }) };
+    delete legacyAttempt.sessionStartedAt;
+    const json = JSON.stringify({
+      version: BACKUP_VERSION,
+      exportedAt: Date.now(),
+      attempts: [legacyAttempt],
+      questionStats: [],
+      wrongNotes: [],
+      favorites: [],
+      settings: DEFAULT_SETTINGS,
+    });
+
+    const backup = parseBackup(json);
+
+    expect(backup).not.toBeNull();
+    expect(backup?.attempts[0].sessionStartedAt).toBe(5000);
   });
 
   it("attempts 원소의 필드 타입이 잘못되면 전체를 null로 거부한다", () => {
