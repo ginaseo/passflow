@@ -106,7 +106,9 @@ function PracticeContent() {
         // entryType이 round가 아니면(random) 원래 문항 집합을 재구성할 방법이 없다 —
         // 어떤 문항이 원래 뽑혔었는지는 attempt가 기록된 것만 알 수 있고, 안 풀고 넘어간
         // 문항은 애초에 저장된 적이 없다. 이 경우 기존 동작(학습모드, 안 푼 문항만)으로 대체한다.
-        if (resumeSession && resumeSession.entryType === "round") {
+        // 학습모드는 이 복원 경로를 타면 안 된다 — select()가 이미 답한 문항에서 즉시
+        // return하며 정답 피드백이 펼쳐진 채로 나오므로, 시험모드(entryType === "round")에서만 사용한다.
+        if (resumeSession && resumeSession.mode === "exam" && resumeSession.entryType === "round") {
           const questions = [...pool].sort((a, b) => a.qnum - b.qnum);
           if (questions.length === 0) {
             setPhase({ kind: "error", message: "이어서 풀 문항이 없다." });
@@ -119,19 +121,13 @@ function PracticeContent() {
             if (answer !== undefined) initialAnswers[index] = answer;
           });
 
-          const elapsedMs = Date.now() - resumeSession.startedAt;
-          const remainingTimeLimitMs =
-            resumeSession.timeLimitMs !== null
-              ? Math.max(0, resumeSession.timeLimitMs - elapsedMs)
-              : null;
-
           setPhase({
             kind: "active",
             questions,
             theoryMap,
             mode: resumeSession.mode,
             entryType: "round",
-            timeLimitMs: remainingTimeLimitMs,
+            timeLimitMs: resumeSession.timeLimitMs,
             autoSaveWrongNotes: settings.autoSaveWrongNotes,
             initialAnswers,
             initialSessionId: resumeSession.sessionId,

@@ -110,8 +110,7 @@ export function PracticeSession({
       // 시험모드는 답을 자유롭게 바꿀 수 있다 — 고를 때마다 즉시 기록해서 중간 이탈(새로고침 등)에도
       // 유실되지 않게 하되, 재선택 시엔 매번 새 attempt를 추가한다(덮어쓰지 않음). scoreExamSession이
       // 세션 내 같은 문항에 대해 이미 "가장 늦은 solvedAt 우선"으로 채점하므로 별도 로직 없이 정확하다.
-      // 제출 시점의 submitExam() 일괄 기록은 그대로 남겨서 최종 확정값 역할을 한다(항상 가장 늦은
-      // 타임스탬프를 갖게 되므로, 연타로 인한 저장 순서 레이스가 있어도 결국 이 값이 채점에 반영된다).
+      // submitExam()은 이 즉시기록을 다시 반복 기록하지 않는다 — 여기서 기록한 값이 곧 최종값이다.
       setAnswers((prev) => ({ ...prev, [current]: answer }));
       const isCorrect = gradeAnswer(question, answer);
       progressRepository
@@ -140,30 +139,11 @@ export function PracticeSession({
   }
 
   function submitExam() {
-    const answeredCount = Object.keys(answers).length;
-    // ponytail: 시험모드는 문항 재선택이 자유로워 문항별 정확한 풀이시간을 못 잰다.
-    // 전체 소요시간을 답한 문항 수로 균등 분배한다 — 문항별 세부 통계는 Phase 2.
-    const avgSolveTimeMs =
-      answeredCount === 0
-        ? 0
-        : Math.round((Date.now() - sessionStartedAt) / answeredCount);
-
+    // select()가 답을 고를 때마다 이미 recordAttempt로 즉시 기록하므로, 여기서는 다시 기록하지
+    // 않는다 — 반복 기록하면 questionStats의 정답/오답 카운트가 문항당 최소 2배로 부풀려진다.
     for (const [indexStr, answer] of Object.entries(answers)) {
       const q = questions[Number(indexStr)];
       const isCorrect = gradeAnswer(q, answer);
-      progressRepository
-        .recordAttempt({
-          questionId: q.questionId,
-          solvedAt: Date.now(),
-          mode: "exam",
-          entryType,
-          selectedAnswer: answer,
-          isCorrect,
-          solveTimeMs: avgSolveTimeMs,
-          sessionId,
-          timeLimitMs,
-        })
-        .catch((err) => console.error("recordAttempt failed:", err));
 
       if (!isCorrect) {
         progressRepository
