@@ -71,11 +71,37 @@ describe("IndexedDbProgressRepository", () => {
     };
 
     await repo.recordAttempt({ ...base, solvedAt: 1000, isCorrect: true, sessionId: "session-1" });
-    await repo.recordAttempt({ ...base, solvedAt: 2000, isCorrect: false, sessionId: "session-1" });
-    await repo.recordAttempt({ ...base, solvedAt: 3000, isCorrect: true, sessionId: "session-1" });
+    await repo.recordAttempt({ ...base, solvedAt: 2000, isCorrect: false, sessionId: "session-2" });
+    await repo.recordAttempt({ ...base, solvedAt: 3000, isCorrect: true, sessionId: "session-3" });
 
     const stats = await repo.getQuestionStats("2023-1-Q1");
     expect(stats.correctCount).toBe(2);
+    expect(stats.wrongCount).toBe(1);
+    expect(stats.lastSolvedAt).toBe(3000);
+  });
+
+  it("같은 세션에서 같은 문항을 재선택하면 QuestionStats가 중복 집계되지 않는다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    const base = {
+      questionId: "2023-1-Q1",
+      mode: "exam" as const,
+      entryType: "round" as const,
+      solveTimeMs: 1000,
+      timeLimitMs: null,
+      sessionId: "session-1",
+    };
+
+    await repo.recordAttempt({ ...base, solvedAt: 1000, selectedAnswer: 1, isCorrect: false });
+    await repo.recordAttempt({ ...base, solvedAt: 2000, selectedAnswer: 2, isCorrect: true });
+    await repo.recordAttempt({ ...base, solvedAt: 3000, selectedAnswer: 3, isCorrect: false });
+
+    const attempts = await repo.getAttempts("2023-1-Q1");
+    expect(attempts).toHaveLength(1);
+    expect(attempts[0].selectedAnswer).toBe(3);
+    expect(attempts[0].solvedAt).toBe(3000);
+
+    const stats = await repo.getQuestionStats("2023-1-Q1");
+    expect(stats.correctCount).toBe(0);
     expect(stats.wrongCount).toBe(1);
     expect(stats.lastSolvedAt).toBe(3000);
   });

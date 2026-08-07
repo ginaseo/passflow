@@ -128,22 +128,32 @@ export class IndexedDbProgressRepository implements ProgressRepository {
     }
     try {
       const tx = db.transaction(["attempts", "questionStats"], "readwrite");
+      const attemptsStore = tx.objectStore("attempts");
 
-      await tx.objectStore("attempts").add(attempt as Attempt);
+      // 같은 세션에서 같은 문항을 재선택(시험모드는 답을 자유롭게 바꿀 수 있음)하면
+      // 별개 시도로 또 쌓지 않고 기존 row를 덮어쓴다 — 그래야 questionStats/대시보드
+      // 정답률이 재선택 횟수만큼 부풀려지지 않는다. 다른 세션(다른 날 재풀이)은 그대로 누적.
+      const sameQuestion = await attemptsStore.index("questionId").getAll(attempt.questionId);
+      const existingAttempt = sameQuestion.find((a) => a.sessionId === attempt.sessionId);
 
       const statsStore = tx.objectStore("questionStats");
-      const existing = await statsStore.get(attempt.questionId);
-      const next: QuestionStats = existing ?? {
+      const next: QuestionStats = (await statsStore.get(attempt.questionId)) ?? {
         questionId: attempt.questionId,
         correctCount: 0,
         wrongCount: 0,
         lastSolvedAt: 0,
       };
-      if (attempt.isCorrect) {
-        next.correctCount += 1;
+
+      if (existingAttempt) {
+        if (existingAttempt.isCorrect) next.correctCount -= 1;
+        else next.wrongCount -= 1;
+        await attemptsStore.put({ ...attempt, id: existingAttempt.id } as Attempt);
       } else {
-        next.wrongCount += 1;
+        await attemptsStore.add(attempt as Attempt);
       }
+
+      if (attempt.isCorrect) next.correctCount += 1;
+      else next.wrongCount += 1;
       next.lastSolvedAt = attempt.solvedAt;
       await statsStore.put(next);
 
