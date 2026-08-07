@@ -108,8 +108,8 @@ export function PracticeSession({
       }
     } else {
       // 시험모드는 답을 자유롭게 바꿀 수 있다 — 고를 때마다 즉시 기록해서 중간 이탈(새로고침 등)에도
-      // 유실되지 않게 하되, 재선택 시엔 매번 새 attempt를 추가한다(덮어쓰지 않음). scoreExamSession이
-      // 세션 내 같은 문항에 대해 이미 "가장 늦은 solvedAt 우선"으로 채점하므로 별도 로직 없이 정확하다.
+      // 유실되지 않게 한다. recordAttempt는 (questionId, sessionId) 기준 upsert라 재선택해도
+      // attempts에 중복 row가 쌓이지 않고 questionStats도 부풀려지지 않는다(#41).
       // submitExam()은 이 즉시기록을 다시 반복 기록하지 않는다 — 여기서 기록한 값이 곧 최종값이다.
       setAnswers((prev) => ({ ...prev, [current]: answer }));
       const isCorrect = gradeAnswer(question, answer);

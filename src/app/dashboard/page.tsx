@@ -7,8 +7,8 @@ import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { listExamSessions, scoreExamSession } from "@/lib/latestExamResult";
 import type { SubjectScore } from "@/lib/summary";
 import { SUBJECT_NAMES } from "@/lib/theory";
-import { parseQuestionId } from "@/lib/questionId";
-import type { DashboardSummary, WrongNote } from "@/types/progress";
+import { tryParseQuestionId } from "@/lib/questionId";
+import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
 const questionRepository = new JsonQuestionRepository();
@@ -92,11 +92,12 @@ export default function DashboardPage() {
     );
 
     progressRepository.getWrongNotes().then(
-      (notes: WrongNote[]) => {
+      (notes) => {
         const counts: Record<string, number> = {};
         for (const note of notes) {
           if (note.mode !== "exam") continue;
-          const { examId } = parseQuestionId(note.questionId);
+          const examId = tryParseQuestionId(note.questionId)?.examId;
+          if (!examId) continue;
           counts[examId] = (counts[examId] ?? 0) + 1;
         }
         setExamWrongCounts(counts);

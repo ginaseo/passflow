@@ -6,7 +6,7 @@ import { ReviewList } from "@/features/review/ReviewList";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
-import { parseQuestionId } from "@/lib/questionId";
+import { tryParseQuestionId } from "@/lib/questionId";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
@@ -105,16 +105,20 @@ function ReviewContent() {
       ? questions.filter((q) => {
           const note = wrongNotesById.get(q.questionId);
           if (modeFilter !== "all" && note?.mode !== modeFilter) return false;
-          if (roundFilter !== "all" && parseQuestionId(q.questionId).examId !== roundFilter) return false;
+          if (roundFilter !== "all" && tryParseQuestionId(q.questionId)?.examId !== roundFilter) return false;
           return true;
         })
       : questions;
 
   const availableRounds =
     tab === "wrong"
-      ? [...new Set(questions.map((q) => parseQuestionId(q.questionId).examId))].sort((a, b) =>
-          b.localeCompare(a)
-        )
+      ? [
+          ...new Set(
+            questions
+              .map((q) => tryParseQuestionId(q.questionId)?.examId)
+              .filter((examId): examId is string => examId !== undefined)
+          ),
+        ].sort((a, b) => b.localeCompare(a))
       : [];
 
   // Reusable for imperative reloads (e.g. the "복습 목록으로" button) — never referenced
@@ -306,7 +310,7 @@ function ReviewContent() {
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
           metaFor={(id) => {
-            const { examId } = parseQuestionId(id);
+            const examId = tryParseQuestionId(id)?.examId;
             const mode = tab === "wrong" ? wrongNotesById.get(id)?.mode : modeById.get(id);
             const modeLabel = mode === "exam" ? "시험모드" : mode === "study" ? "학습모드" : null;
 
@@ -314,8 +318,10 @@ function ReviewContent() {
               const note = wrongNotesById.get(id);
               if (!note) return null;
               const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
-              return modeLabel ? `${date} · ${examId} · ${modeLabel}` : `${date} · ${examId}`;
+              const rest = [examId, modeLabel].filter(Boolean).join(" · ");
+              return rest ? `${date} · ${rest}` : date;
             }
+            if (!examId) return modeLabel;
             return modeLabel ? `${examId} · ${modeLabel}` : examId;
           }}
         />

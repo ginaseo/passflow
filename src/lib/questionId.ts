@@ -12,3 +12,14 @@ export function parseQuestionId(questionId: string): { examId: string; qnum: num
     qnum: Number(questionId.slice(markerIndex + 2)),
   };
 }
+
+// wrongNotes/favorites/attempts는 백업 import로 손상된 questionId가 섞여 들어올 수 있다
+// (backup.ts는 questionId를 문자열인지만 검증한다) — UI 렌더링 중 이런 값을 만나도
+// 화면 전체가 죽지 않도록, 신뢰할 수 없는 저장 데이터를 다루는 곳에서는 이 버전을 쓴다.
+export function tryParseQuestionId(questionId: string): { examId: string; qnum: number } | null {
+  try {
+    return parseQuestionId(questionId);
+  } catch {
+    return null;
+  }
+}
