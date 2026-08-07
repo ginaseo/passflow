@@ -9,7 +9,7 @@ import { pickRandomQuestions, pickStratifiedRandomQuestions } from "@/lib/sampli
 import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
 import { SUBJECT_NAMES } from "@/lib/theory";
-import { getUnansweredQuestions } from "@/lib/resumeExam";
+import { getUnansweredQuestions, pickResumeSession } from "@/lib/resumeExam";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
@@ -33,6 +33,9 @@ type Phase =
       entryType: EntryType;
       timeLimitMs: number | null;
       autoSaveWrongNotes: boolean;
+      initialAnswers?: Record<number, number>;
+      initialSessionId?: string;
+      initialSessionStartedAt?: number;
     }
   | { kind: "done"; summary: SessionSummary; mode: Mode; entryType: EntryType }
   | { kind: "error"; message: string };
@@ -97,6 +100,45 @@ function PracticeContent() {
           settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS),
         ]);
         if (requestId !== latestResumeRequestId.current) return;
+
+        const resumeSession = pickResumeSession(attempts, resumeExamId);
+
+        // entryType이 round가 아니면(random) 원래 문항 집합을 재구성할 방법이 없다 —
+        // 어떤 문항이 원래 뽑혔었는지는 attempt가 기록된 것만 알 수 있고, 안 풀고 넘어간
+        // 문항은 애초에 저장된 적이 없다. 이 경우 기존 동작(학습모드, 안 푼 문항만)으로 대체한다.
+        if (resumeSession && resumeSession.entryType === "round") {
+          const questions = [...pool].sort((a, b) => a.qnum - b.qnum);
+          if (questions.length === 0) {
+            setPhase({ kind: "error", message: "이어서 풀 문항이 없다." });
+            return;
+          }
+
+          const initialAnswers: Record<number, number> = {};
+          questions.forEach((q, index) => {
+            const answer = resumeSession.answersByQnum[q.qnum];
+            if (answer !== undefined) initialAnswers[index] = answer;
+          });
+
+          const elapsedMs = Date.now() - resumeSession.startedAt;
+          const remainingTimeLimitMs =
+            resumeSession.timeLimitMs !== null
+              ? Math.max(0, resumeSession.timeLimitMs - elapsedMs)
+              : null;
+
+          setPhase({
+            kind: "active",
+            questions,
+            theoryMap,
+            mode: resumeSession.mode,
+            entryType: "round",
+            timeLimitMs: remainingTimeLimitMs,
+            autoSaveWrongNotes: settings.autoSaveWrongNotes,
+            initialAnswers,
+            initialSessionId: resumeSession.sessionId,
+            initialSessionStartedAt: resumeSession.startedAt,
+          });
+          return;
+        }
 
         const questions = getUnansweredQuestions(pool, attempts, resumeExamId).sort(
           (a, b) => a.qnum - b.qnum
@@ -282,6 +324,9 @@ function PracticeContent() {
       entryType={phase.entryType}
       timeLimitMs={phase.timeLimitMs}
       autoSaveWrongNotes={phase.autoSaveWrongNotes}
+      initialAnswers={phase.initialAnswers}
+      initialSessionId={phase.initialSessionId}
+      initialSessionStartedAt={phase.initialSessionStartedAt}
       onFinish={(summary) => setPhase({ kind: "done", summary, mode: phase.mode, entryType: phase.entryType })}
     />
   );
