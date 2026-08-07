@@ -7,7 +7,6 @@ import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { listExamSessions, scoreExamSession } from "@/lib/latestExamResult";
 import type { SubjectScore } from "@/lib/summary";
 import { SUBJECT_NAMES } from "@/lib/theory";
-import { tryParseQuestionId } from "@/lib/questionId";
 import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -39,7 +38,11 @@ function formatDateTime(ts: number): string {
   });
 }
 
-function CbtCard({ result: r, wrongCount }: { result: CbtResult; wrongCount: number }) {
+function CbtCard({ result: r }: { result: CbtResult }) {
+  // 이 회차를 응시했을 때 실제로 틀리거나(또는 안 푼) 문항 수 — 그 세션의 attempts로만
+  // 계산되므로, 이후 오답노트에서 재도전해 맞히더라도 이 숫자는 절대 바뀌지 않는다.
+  // 오답노트 상태(wrongNotes)에 의존하면 재도전 결과에 따라 계속 흔들리게 된다.
+  const wrongCount = r.total - r.correct;
   return (
     <div className="p-4 rounded border flex flex-col gap-2">
       <div className="flex justify-between items-baseline">
@@ -79,7 +82,6 @@ export default function DashboardPage() {
   const [error, setError] = useState(false);
   const [cbtResults, setCbtResults] = useState<CbtResult[] | null>(null);
   const [cbtError, setCbtError] = useState(false);
-  const [examWrongCounts, setExamWrongCounts] = useState<Record<string, number>>({});
   const [showAllCbt, setShowAllCbt] = useState(false);
 
   useEffect(() => {
@@ -89,20 +91,6 @@ export default function DashboardPage() {
         console.error("getDashboardSummary failed:", err);
         setError(true);
       }
-    );
-
-    progressRepository.getWrongNotes().then(
-      (notes) => {
-        const counts: Record<string, number> = {};
-        for (const note of notes) {
-          if (note.mode !== "exam") continue;
-          const examId = tryParseQuestionId(note.questionId)?.examId;
-          if (!examId) continue;
-          counts[examId] = (counts[examId] ?? 0) + 1;
-        }
-        setExamWrongCounts(counts);
-      },
-      (err) => console.error("getWrongNotes failed:", err)
     );
 
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()])
@@ -177,7 +165,7 @@ export default function DashboardPage() {
         ) : (
           <>
             {cbtResults.slice(0, 3).map((r) => (
-              <CbtCard key={r.sessionId} result={r} wrongCount={examWrongCounts[r.examId] ?? 0} />
+              <CbtCard key={r.sessionId} result={r} />
             ))}
             {cbtResults.length > 3 && (
               <>
@@ -189,11 +177,7 @@ export default function DashboardPage() {
                   {showAllCbt ? "접기" : `이전 기록 더보기 (${cbtResults.length - 3}개)`}
                 </button>
                 {showAllCbt &&
-                  cbtResults
-                    .slice(3)
-                    .map((r) => (
-                      <CbtCard key={r.sessionId} result={r} wrongCount={examWrongCounts[r.examId] ?? 0} />
-                    ))}
+                  cbtResults.slice(3).map((r) => <CbtCard key={r.sessionId} result={r} />)}
               </>
             )}
           </>
