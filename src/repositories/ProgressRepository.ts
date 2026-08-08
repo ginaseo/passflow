@@ -3,6 +3,7 @@ import { isSameLocalDay } from "@/lib/timer";
 import { dedupeAttemptsBySession } from "@/lib/attempts";
 import type { Attempt, DashboardSummary, Favorite, Mode, QuestionStats, WrongNote } from "@/types/progress";
 import type { Settings } from "@/types/settings";
+import { clearAutoBackup } from "@/lib/autoBackup";
 import { SETTINGS_KEY, clearSettingsFallback } from "./SettingsRepository";
 import {
   activateStorageFallback,
@@ -354,6 +355,10 @@ export class IndexedDbProgressRepository implements ProgressRepository {
   }
 
   async resetAll(): Promise<void> {
+    // 전체 초기화는 사용자가 명시적으로 데이터를 지우겠다는 의도다 — 자동 백업
+    // 스냅샷을 남겨두면 "자동 백업에서 복구" 버튼으로 방금 지운 데이터가 조용히
+    // 되살아나 초기화가 무의미해진다. 함께 지운다.
+    clearAutoBackup();
     writeLocalStorage(WRONG_NOTES_KEY, {});
     writeLocalStorage(FAVORITES_KEY, {});
     writeLocalStorage(WRONG_NOTES_TOMBSTONES_KEY, {});

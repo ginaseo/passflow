@@ -18,6 +18,14 @@ export function writeAutoBackup(data: {
   }
 }
 
+export function clearAutoBackup(): void {
+  try {
+    localStorage.removeItem(AUTO_BACKUP_KEY);
+  } catch {
+    // 최선 노력 — 실패해도 조용히 건너뛴다.
+  }
+}
+
 export function readAutoBackup(): Backup | null {
   let raw: string | null;
   try {

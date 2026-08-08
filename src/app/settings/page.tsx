@@ -24,7 +24,9 @@ export default function SettingsPage() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [autoBackupExportedAt] = useState<number | null>(() => readAutoBackup()?.exportedAt ?? null);
+  const [autoBackupExportedAt, setAutoBackupExportedAt] = useState<number | null>(
+    () => readAutoBackup()?.exportedAt ?? null
+  );
   const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
@@ -75,7 +77,10 @@ export default function SettingsPage() {
   function handleReset() {
     if (!window.confirm("모든 풀이 기록·오답노트·즐겨찾기를 지운다. 되돌릴 수 없다. 계속할까?")) return;
     progressRepository.resetAll().then(
-      () => setResetDone(true),
+      () => {
+        setResetDone(true);
+        setAutoBackupExportedAt(null);
+      },
       (err) => console.error("resetAll failed:", err)
     );
   }
