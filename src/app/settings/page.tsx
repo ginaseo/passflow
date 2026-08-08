@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { parseBackup, serializeBackup } from "@/lib/backup";
+import { readAutoBackup } from "@/lib/autoBackup";
 import { isStorageFallbackActive } from "@/repositories/storageFallback";
 import { DEFAULT_SETTINGS, type ReviewOrder, type Settings, type TimeoutBehavior } from "@/types/settings";
 import type { Mode } from "@/types/progress";
@@ -23,6 +24,10 @@ export default function SettingsPage() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [autoBackupExportedAt, setAutoBackupExportedAt] = useState<number | null>(
+    () => readAutoBackup()?.exportedAt ?? null
+  );
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     settingsRepository.getSettings().then(
@@ -33,6 +38,32 @@ export default function SettingsPage() {
       }
     );
   }, []);
+
+  async function handleRestoreAutoBackup() {
+    const backup = readAutoBackup();
+    if (!backup) {
+      setImportMessage("자동 백업이 없다.");
+      return;
+    }
+    if (!window.confirm("가장 최근 세션 종료 시점의 자동 백업으로 병합한다. 계속할까?")) return;
+    setImportMessage(null);
+    setRestoring(true);
+    try {
+      await progressRepository.importBackup({
+        attempts: backup.attempts,
+        wrongNotes: backup.wrongNotes,
+        favorites: backup.favorites,
+        settings: backup.settings,
+      });
+      setSettings(backup.settings);
+      setImportMessage("자동 백업에서 복구 완료됐다.");
+    } catch (err) {
+      console.error("handleRestoreAutoBackup failed:", err);
+      setImportMessage("복구에 실패했다. 다시 시도해달라.");
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   function update(next: Settings) {
     const prev = settings;
@@ -46,7 +77,10 @@ export default function SettingsPage() {
   function handleReset() {
     if (!window.confirm("모든 풀이 기록·오답노트·즐겨찾기를 지운다. 되돌릴 수 없다. 계속할까?")) return;
     progressRepository.resetAll().then(
-      () => setResetDone(true),
+      () => {
+        setResetDone(true);
+        setAutoBackupExportedAt(null);
+      },
       (err) => console.error("resetAll failed:", err)
     );
   }
@@ -189,6 +223,23 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium">자동 백업</span>
+        <p className="text-xs text-gray-400">
+          {autoBackupExportedAt
+            ? `마지막 자동 백업: ${new Date(autoBackupExportedAt).toLocaleString()} (학습/시험 세션 종료 시마다 갱신됨)`
+            : "아직 자동 백업이 없다 — 세션을 한 번 끝내면 생긴다."}
+        </p>
+        <button
+          type="button"
+          onClick={handleRestoreAutoBackup}
+          disabled={!autoBackupExportedAt || restoring}
+          className="self-start px-3 py-1.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          자동 백업에서 복구
+        </button>
       </div>
 
       <div className="flex flex-col gap-2">

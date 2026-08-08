@@ -7,6 +7,7 @@ import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
 import { tryParseQuestionId } from "@/lib/questionId";
+import { SUBJECT_NAMES } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
@@ -99,6 +100,7 @@ function ReviewContent() {
     return m === "study" || m === "exam" ? m : "all";
   });
   const [roundFilter, setRoundFilter] = useState<string>(() => searchParams.get("examId") ?? "all");
+  const [subjectFilter, setSubjectFilter] = useState<string>(() => searchParams.get("subject") ?? "all");
 
   const filteredQuestions =
     tab === "wrong"
@@ -106,6 +108,7 @@ function ReviewContent() {
           const note = wrongNotesById.get(q.questionId);
           if (modeFilter !== "all" && note?.mode !== modeFilter) return false;
           if (roundFilter !== "all" && tryParseQuestionId(q.questionId)?.examId !== roundFilter) return false;
+          if (subjectFilter !== "all" && String(q.subject) !== subjectFilter) return false;
           return true;
         })
       : questions;
@@ -120,6 +123,9 @@ function ReviewContent() {
           ),
         ].sort((a, b) => b.localeCompare(a))
       : [];
+
+  const availableSubjects =
+    tab === "wrong" ? [...new Set(questions.map((q) => q.subject))].sort((a, b) => a - b) : [];
 
   // Reusable for imperative reloads (e.g. the "복습 목록으로" button) — never referenced
   // from the effect below, since react-hooks/set-state-in-effect flags any effect that
@@ -299,6 +305,18 @@ function ReviewContent() {
               </option>
             ))}
           </select>
+          <select
+            value={subjectFilter}
+            onChange={(e) => setSubjectFilter(e.target.value)}
+            className="px-2 py-1.5 rounded border text-sm"
+          >
+            <option value="all">전체 과목</option>
+            {availableSubjects.map((subject) => (
+              <option key={subject} value={subject}>
+                {SUBJECT_NAMES[subject]}
+              </option>
+            ))}
+          </select>
         </div>
       )}
       {loading ? (
@@ -309,20 +327,22 @@ function ReviewContent() {
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
-          metaFor={(id) => {
+          metaFor={(question) => {
+            const id = question.questionId;
             const examId = tryParseQuestionId(id)?.examId;
             const mode = tab === "wrong" ? wrongNotesById.get(id)?.mode : modeById.get(id);
             const modeLabel = mode === "exam" ? "시험모드" : mode === "study" ? "학습모드" : null;
+            const subjectLabel = SUBJECT_NAMES[question.subject];
 
             if (tab === "wrong") {
               const note = wrongNotesById.get(id);
               if (!note) return null;
               const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
-              const rest = [examId, modeLabel].filter(Boolean).join(" · ");
+              const rest = [examId, modeLabel, subjectLabel].filter(Boolean).join(" · ");
               return rest ? `${date} · ${rest}` : date;
             }
-            if (!examId) return modeLabel;
-            return modeLabel ? `${examId} · ${modeLabel}` : examId;
+            const rest = [examId, modeLabel, subjectLabel].filter(Boolean).join(" · ");
+            return rest || null;
           }}
         />
       )}
