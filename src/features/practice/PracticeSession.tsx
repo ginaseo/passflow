@@ -321,7 +321,7 @@ export function PracticeSession({
         >
           ← 이전
         </button>
-        <span>Space: 다음 · 1~4: 답 선택 · F: 즐겨찾기</span>
+        <span>Space: 다음 · ←→: 이전/다음 · ↑↓: 이동 · 1~4: 답 선택 · F: 즐겨찾기</span>
         {current === questions.length - 1 || allAnswered ? (
           <button type="button" onClick={finish} className="text-blue-700 font-medium">
             종료
