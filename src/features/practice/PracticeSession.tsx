@@ -7,7 +7,9 @@ import { gradeAnswer } from "@/lib/grading";
 import { resolveTheoryLink } from "@/lib/theory";
 import { summarizeSession, type SessionSummary } from "@/lib/summary";
 import { formatDuration, remainingMs } from "@/lib/timer";
+import { writeAutoBackup } from "@/lib/autoBackup";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
+import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import type { EntryType, Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
@@ -26,6 +28,28 @@ interface PracticeSessionProps {
 }
 
 const progressRepository = new IndexedDbProgressRepository();
+const settingsRepository = new IndexedDbSettingsRepository();
+
+// 세션 종료마다 전체 진행 데이터를 localStorage에 스냅샷으로 남긴다 — 배포 코드
+// 문제 등으로 IndexedDB 쪽 실데이터가 유실돼도(#54) 최근 스냅샷으로 즉시 복구
+// 가능하게 하는 최선 노력의 안전망이다. 실패해도 세션 종료 흐름은 막지 않는다.
+async function runAutoBackup(): Promise<void> {
+  try {
+    const [attempts, wrongNotes, favorites, settings] = await Promise.all([
+      progressRepository.getAttempts(),
+      progressRepository.getWrongNotes(),
+      progressRepository.getFavorites(),
+      settingsRepository.getSettings(),
+    ]);
+    const questionIds = [...new Set(attempts.map((a) => a.questionId))];
+    const questionStats = await Promise.all(
+      questionIds.map((id) => progressRepository.getQuestionStats(id))
+    );
+    writeAutoBackup({ attempts, questionStats, wrongNotes, favorites, settings });
+  } catch (err) {
+    console.error("autoBackup failed:", err);
+  }
+}
 
 export function PracticeSession({
   questions,
@@ -168,31 +192,39 @@ export function PracticeSession({
     action.catch((err) => console.error("toggleFavorite failed:", err));
   }
 
-  function submitExam() {
+  async function submitExam(): Promise<void> {
     // select()가 답을 고를 때마다 이미 recordAttempt로 즉시 기록하므로, 여기서는 다시 기록하지
     // 않는다 — 반복 기록하면 questionStats의 정답/오답 카운트가 문항당 최소 2배로 부풀려진다.
+    // addWrongNote 쓰기를 여기서 기다리는 이유는 뒤이은 runAutoBackup()이 방금 추가된
+    // 오답노트까지 스냅샷에 담게 하기 위함이다 — 안 기다리면 자동백업이 경합 상태로
+    // 이 회차의 오답노트를 놓칠 수 있다.
+    const writes: Promise<void>[] = [];
     for (const [indexStr, answer] of Object.entries(answers)) {
       const q = questions[Number(indexStr)];
       const isCorrect = gradeAnswer(q, answer);
 
       if (!isCorrect) {
-        progressRepository
-          .addWrongNote(q.questionId, "exam")
-          .catch((err) => console.error("addWrongNote failed:", err));
+        writes.push(
+          progressRepository
+            .addWrongNote(q.questionId, "exam")
+            .catch((err) => console.error("addWrongNote failed:", err))
+        );
       }
     }
+    await Promise.all(writes);
 
     onFinish(summarizeSession(questions, answers));
   }
 
-  function finish() {
+  async function finish() {
     if (finishedRef.current) return;
     finishedRef.current = true;
     if (mode === "exam") {
-      submitExam();
+      await submitExam();
     } else {
       onFinish(summarizeSession(questions, answers));
     }
+    void runAutoBackup();
   }
 
   useEffect(() => {
