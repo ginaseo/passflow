@@ -63,24 +63,29 @@ export function PracticeSetup({
   const [subjects, setSubjects] = useState<{ subject: number; subjectName?: string }[]>([]);
 
   useEffect(() => {
-    Promise.all([
-      questionRepository.getExamIndex(),
-      progressRepository.getAttempts(),
-      questionRepository.getQuestions({}),
-    ]).then(
-      ([examList, attempts, allQuestions]) => {
+    Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()]).then(
+      ([examList, attempts]) => {
         setExams(examList);
         setStatuses(computeExamStatuses(examList, attempts));
+      },
+      (err) => {
+        console.error("회차 목록을 불러오지 못했다:", err);
+        setExams([]);
+      }
+    );
+
+    // 과목 버튼 목록만을 위해 전체 문항을 내려받는다 — 회차 목록·상태 표시는 위
+    // 요청과 분리해서 이걸 기다리지 않고 먼저 뜨게 한다(전체 문항 fetch는 자격증
+    // 회차가 많을수록 오래 걸릴 수 있다). 여기서 채운 캐시는 "시작" 시 재사용된다.
+    questionRepository.getQuestions({}).then(
+      (allQuestions) => {
         setSubjects(
           [...new Map(allQuestions.map((q) => [q.subject, q.subjectName] as const)).entries()]
             .map(([subject, subjectName]) => ({ subject, subjectName }))
             .sort((a, b) => a.subject - b.subject)
         );
       },
-      (err) => {
-        console.error("회차 목록을 불러오지 못했다:", err);
-        setExams([]);
-      }
+      (err) => console.error("과목 목록을 불러오지 못했다:", err)
     );
   }, [questionRepository]);
 

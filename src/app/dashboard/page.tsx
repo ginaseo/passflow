@@ -6,8 +6,7 @@ import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { listExamSessions, scoreExamSession } from "@/lib/latestExamResult";
 import { getSelectedCertId } from "@/lib/cert";
-import { computeDashboardSummary } from "@/lib/dashboardSummary";
-import { tryParseQuestionId } from "@/lib/questionId";
+import { computeDashboardSummary, scopeAttemptsToExams } from "@/lib/dashboardSummary";
 import type { SubjectScore } from "@/lib/summary";
 import { getSubjectLabel } from "@/lib/theory";
 import type { DashboardSummary } from "@/types/progress";
@@ -92,15 +91,9 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()])
       .then(async ([exams, attempts]) => {
-        // attempts는 전 자격증 통틀어 하나의 IndexedDB에 쌓인다 — 현재 선택된 자격증의
-        // 회차에 속한 것만 걸러서 대시보드 상단 통계에 쓴다. CBT 응시 기록 목록은
-        // exams.find(...)가 이미 자연스럽게 걸러주므로 그대로 둔다.
-        const examIds = new Set(exams.map((e) => e.examId));
-        const scopedAttempts = attempts.filter((a) => {
-          const examId = tryParseQuestionId(a.questionId)?.examId;
-          return examId !== undefined && examIds.has(examId);
-        });
-        setSummary(computeDashboardSummary(scopedAttempts));
+        // CBT 응시 기록 목록은 exams.find(...)가 이미 자연스럽게 자격증별로 걸러주므로
+        // 그대로 둔다 — 상단 통계만 scopeAttemptsToExams로 별도 필터링한다.
+        setSummary(computeDashboardSummary(scopeAttemptsToExams(attempts, exams)));
 
         const sessions = listExamSessions(attempts);
         const results = await Promise.all(

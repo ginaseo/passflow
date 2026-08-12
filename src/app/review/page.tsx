@@ -333,12 +333,12 @@ function ReviewContent() {
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
-          metaFor={(question) => {
-            const id = question.questionId;
+          metaFor={(id) => {
+            const question = questions.find((q) => q.questionId === id);
             const examId = tryParseQuestionId(id)?.examId;
             const mode = tab === "wrong" ? wrongNotesById.get(id)?.mode : modeById.get(id);
             const modeLabel = mode === "exam" ? "시험모드" : mode === "study" ? "학습모드" : null;
-            const subjectLabel = getSubjectLabel(question);
+            const subjectLabel = question ? getSubjectLabel(question) : null;
 
             if (tab === "wrong") {
               const note = wrongNotesById.get(id);

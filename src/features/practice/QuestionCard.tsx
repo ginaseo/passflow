@@ -2,6 +2,7 @@
 
 import { isCorrectOption } from "@/lib/grading";
 import { getSubjectLabel } from "@/lib/theory";
+import type { Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryLink } from "@/types/theory";
 
@@ -9,6 +10,7 @@ interface QuestionCardProps {
   question: Question;
   index: number;
   total: number;
+  mode: Mode;
   selectedAnswer: number | null;
   showFeedback: boolean;
   theoryLink: TheoryLink | null;
@@ -21,6 +23,7 @@ export function QuestionCard({
   question,
   index,
   total,
+  mode,
   selectedAnswer,
   showFeedback,
   theoryLink,
@@ -35,7 +38,8 @@ export function QuestionCard({
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
       <div className="flex items-center justify-between text-sm text-gray-500">
         <span>
-          {index + 1} / {total} · {getSubjectLabel(question)}
+          {index + 1} / {total}
+          {mode === "exam" && ` · ${getSubjectLabel(question)}`}
         </span>
         <button type="button" onClick={onFavorite} className="text-yellow-600">
           {isFavorited ? "★ 즐겨찾기 완료" : "☆ 즐겨찾기"}
