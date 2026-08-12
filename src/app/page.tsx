@@ -6,6 +6,8 @@ import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { pickResumeExamId } from "@/lib/resumeExam";
 import { getSelectedCertId } from "@/lib/cert";
+import { computeDashboardSummary } from "@/lib/dashboardSummary";
+import { tryParseQuestionId } from "@/lib/questionId";
 import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -21,21 +23,28 @@ export default function HomePage() {
   const [resumeExam, setResumeExam] = useState<{ examId: string; title: string } | null>(null);
 
   useEffect(() => {
-    progressRepository.getDashboardSummary().then(
-      (result) => setSummary(result),
-      (err) => {
-        console.error("getDashboardSummary failed:", err);
-        setError(true);
-      }
-    );
-
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()])
       .then(([exams, attempts]) => {
-        const resumeExamId = pickResumeExamId(exams, attempts);
+        // attempts는 전 자격증 통틀어 하나의 IndexedDB에 쌓인다 — questionId에 박힌
+        // examId가 현재 선택된 자격증의 회차 목록에 속하는 것만 걸러서 대시보드 통계와
+        // "이어서풀기" 대상 계산 양쪽에 쓴다. 안 그러면 자격증을 바꿔도 다른 자격증
+        // 풀이 기록이 통계에 섞여 나온다.
+        const examIds = new Set(exams.map((e) => e.examId));
+        const scopedAttempts = attempts.filter((a) => {
+          const examId = tryParseQuestionId(a.questionId)?.examId;
+          return examId !== undefined && examIds.has(examId);
+        });
+
+        setSummary(computeDashboardSummary(scopedAttempts));
+
+        const resumeExamId = pickResumeExamId(exams, scopedAttempts);
         const resumeExamEntry = resumeExamId ? exams.find((e) => e.examId === resumeExamId) : undefined;
         setResumeExam(resumeExamId && resumeExamEntry ? { examId: resumeExamId, title: resumeExamEntry.title } : null);
       })
-      .catch((err) => console.error("이어서풀기 대상 계산 실패:", err));
+      .catch((err) => {
+        console.error("대시보드 데이터 계산 실패:", err);
+        setError(true);
+      });
   }, [questionRepository]);
 
   if (error) {

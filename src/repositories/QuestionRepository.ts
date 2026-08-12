@@ -49,6 +49,7 @@ export class JsonQuestionRepository implements QuestionRepository {
               stem: q.stem,
               options: q.options,
               subject: q.subject,
+              subjectName: q.subjectName,
               answer: q.answer,
               explanation: q.explanation,
               image: q.image ? `${this.certId}/${q.image}` : null,

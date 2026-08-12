@@ -45,7 +45,12 @@ export function scoreExamSession(
   const total = questions.length;
 
   for (const q of questions) {
-    const subjectScore = bySubject.get(q.subject) ?? { subject: q.subject, total: 0, correct: 0 };
+    const subjectScore = bySubject.get(q.subject) ?? {
+      subject: q.subject,
+      subjectName: q.subjectName,
+      total: 0,
+      correct: 0,
+    };
     subjectScore.total++;
     const a = byQnum.get(q.qnum);
     if (a) {

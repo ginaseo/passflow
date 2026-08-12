@@ -7,7 +7,7 @@ import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
 import { tryParseQuestionId } from "@/lib/questionId";
-import { SUBJECT_NAMES } from "@/lib/theory";
+import { getSubjectLabel } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
 import { JsonQuestionRepository, type QuestionRepository } from "@/repositories/QuestionRepository";
@@ -127,7 +127,11 @@ function ReviewContent() {
       : [];
 
   const availableSubjects =
-    tab === "wrong" ? [...new Set(questions.map((q) => q.subject))].sort((a, b) => a - b) : [];
+    tab === "wrong"
+      ? [...new Map(questions.map((q) => [q.subject, q.subjectName] as const)).entries()]
+          .map(([subject, subjectName]) => ({ subject, subjectName }))
+          .sort((a, b) => a.subject - b.subject)
+      : [];
 
   // Reusable for imperative reloads (e.g. the "복습 목록으로" button) — never referenced
   // from the effect below, since react-hooks/set-state-in-effect flags any effect that
@@ -313,9 +317,9 @@ function ReviewContent() {
             className="px-2 py-1.5 rounded border text-sm"
           >
             <option value="all">전체 과목</option>
-            {availableSubjects.map((subject) => (
+            {availableSubjects.map(({ subject, subjectName }) => (
               <option key={subject} value={subject}>
-                {SUBJECT_NAMES[subject]}
+                {getSubjectLabel({ subject, subjectName })}
               </option>
             ))}
           </select>
@@ -334,7 +338,7 @@ function ReviewContent() {
             const examId = tryParseQuestionId(id)?.examId;
             const mode = tab === "wrong" ? wrongNotesById.get(id)?.mode : modeById.get(id);
             const modeLabel = mode === "exam" ? "시험모드" : mode === "study" ? "학습모드" : null;
-            const subjectLabel = SUBJECT_NAMES[question.subject];
+            const subjectLabel = getSubjectLabel(question);
 
             if (tab === "wrong") {
               const note = wrongNotesById.get(id);

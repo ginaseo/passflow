@@ -6,8 +6,10 @@ import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { listExamSessions, scoreExamSession } from "@/lib/latestExamResult";
 import { getSelectedCertId } from "@/lib/cert";
+import { computeDashboardSummary } from "@/lib/dashboardSummary";
+import { tryParseQuestionId } from "@/lib/questionId";
 import type { SubjectScore } from "@/lib/summary";
-import { SUBJECT_NAMES } from "@/lib/theory";
+import { getSubjectLabel } from "@/lib/theory";
 import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -61,7 +63,7 @@ function CbtCard({ result: r }: { result: CbtResult }) {
       <ul className="text-sm text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
         {r.subjectScores.map((s) => (
           <li key={s.subject}>
-            {SUBJECT_NAMES[s.subject]}: {s.correct}/{s.total}
+            {getSubjectLabel({ subject: s.subject, subjectName: s.subjectName })}: {s.correct}/{s.total}
           </li>
         ))}
       </ul>
@@ -86,16 +88,18 @@ export default function DashboardPage() {
   const [showAllCbt, setShowAllCbt] = useState(false);
 
   useEffect(() => {
-    progressRepository.getDashboardSummary().then(
-      (result) => setSummary(result),
-      (err) => {
-        console.error("getDashboardSummary failed:", err);
-        setError(true);
-      }
-    );
-
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()])
       .then(async ([exams, attempts]) => {
+        // attempts는 전 자격증 통틀어 하나의 IndexedDB에 쌓인다 — 현재 선택된 자격증의
+        // 회차에 속한 것만 걸러서 대시보드 상단 통계에 쓴다. CBT 응시 기록 목록은
+        // exams.find(...)가 이미 자연스럽게 걸러주므로 그대로 둔다.
+        const examIds = new Set(exams.map((e) => e.examId));
+        const scopedAttempts = attempts.filter((a) => {
+          const examId = tryParseQuestionId(a.questionId)?.examId;
+          return examId !== undefined && examIds.has(examId);
+        });
+        setSummary(computeDashboardSummary(scopedAttempts));
+
         const sessions = listExamSessions(attempts);
         const results = await Promise.all(
           sessions.map(async ({ examId, sessionId, solvedAt }) => {
@@ -115,7 +119,8 @@ export default function DashboardPage() {
         setCbtResults(results.filter((r): r is CbtResult => r !== null));
       })
       .catch((err) => {
-        console.error("CBT 결과 목록 계산 실패:", err);
+        console.error("대시보드 데이터 계산 실패:", err);
+        setError(true);
         setCbtError(true);
       });
   }, [questionRepository]);

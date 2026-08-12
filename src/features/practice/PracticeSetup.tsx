@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { computeExamStatuses, type ExamStatus } from "@/lib/examStatus";
-import { SUBJECT_NAMES } from "@/lib/theory";
+import { getSubjectLabel } from "@/lib/theory";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { getSelectedCertId } from "@/lib/cert";
@@ -60,12 +60,22 @@ export function PracticeSetup({
   const [examId, setExamId] = useState<string | null>(null);
   const [exams, setExams] = useState<ExamSummary[] | null>(null);
   const [statuses, setStatuses] = useState<Map<string, ExamStatus>>(new Map());
+  const [subjects, setSubjects] = useState<{ subject: number; subjectName?: string }[]>([]);
 
   useEffect(() => {
-    Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()]).then(
-      ([examList, attempts]) => {
+    Promise.all([
+      questionRepository.getExamIndex(),
+      progressRepository.getAttempts(),
+      questionRepository.getQuestions({}),
+    ]).then(
+      ([examList, attempts, allQuestions]) => {
         setExams(examList);
         setStatuses(computeExamStatuses(examList, attempts));
+        setSubjects(
+          [...new Map(allQuestions.map((q) => [q.subject, q.subjectName] as const)).entries()]
+            .map(([subject, subjectName]) => ({ subject, subjectName }))
+            .sort((a, b) => a.subject - b.subject)
+        );
       },
       (err) => {
         console.error("회차 목록을 불러오지 못했다:", err);
@@ -166,14 +176,14 @@ export function PracticeSetup({
               >
                 통합
               </button>
-              {Object.entries(SUBJECT_NAMES).map(([num, name]) => (
+              {subjects.map(({ subject: num, subjectName }) => (
                 <button
                   key={num}
                   type="button"
-                  onClick={() => setSubject(Number(num))}
-                  className={`px-3 py-1.5 rounded border ${subject === Number(num) ? "bg-black text-white" : ""}`}
+                  onClick={() => setSubject(num)}
+                  className={`px-3 py-1.5 rounded border ${subject === num ? "bg-black text-white" : ""}`}
                 >
-                  {name}
+                  {getSubjectLabel({ subject: num, subjectName })}
                 </button>
               ))}
             </div>

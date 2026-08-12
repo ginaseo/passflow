@@ -8,7 +8,7 @@ import { AnswerGrid } from "@/features/practice/AnswerGrid";
 import { pickRandomQuestions, pickStratifiedRandomQuestions } from "@/lib/sampling";
 import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
-import { SUBJECT_NAMES } from "@/lib/theory";
+import { getSubjectLabel } from "@/lib/theory";
 import { getUnansweredQuestions, pickResumeSession } from "@/lib/resumeExam";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
@@ -58,7 +58,7 @@ function PracticeContent() {
   const initialSubject: number | "all" | undefined =
     subjectParam === "all"
       ? "all"
-      : subjectParam && Number.isInteger(subjectNum) && subjectNum in SUBJECT_NAMES
+      : subjectParam && Number.isInteger(subjectNum) && subjectNum > 0
         ? subjectNum
         : undefined;
 
@@ -291,7 +291,7 @@ function PracticeContent() {
             <ul className="text-sm text-left flex flex-col gap-1">
               {subjectScores.map((score) => (
                 <li key={score.subject} className={isSubjectFailed(score) ? "text-red-700" : ""}>
-                  {SUBJECT_NAMES[score.subject]}: {score.correct}/{score.total}
+                  {getSubjectLabel(score)}: {score.correct}/{score.total}
                   {isSubjectFailed(score) ? " (과락)" : ""}
                 </li>
               ))}
