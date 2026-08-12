@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/PracticeSetup";
 import { PracticeSession } from "@/features/practice/PracticeSession";
@@ -13,12 +13,12 @@ import { getUnansweredQuestions, pickResumeSession } from "@/lib/resumeExam";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { getSelectedCertId } from "@/lib/cert";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { EntryType, Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
-const questionRepository = new JsonQuestionRepository();
 const progressRepository = new IndexedDbProgressRepository();
 const settingsRepository = new IndexedDbSettingsRepository();
 
@@ -41,6 +41,7 @@ type Phase =
   | { kind: "error"; message: string };
 
 function PracticeContent() {
+  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
   const searchParams = useSearchParams();
   const resumeExamId = searchParams.get("resume");
   const [phase, setPhase] = useState<Phase>(resumeExamId ? { kind: "loading" } : { kind: "setup" });
@@ -166,7 +167,7 @@ function PracticeContent() {
         setPhase({ kind: "error", message: "이어서 풀 문항을 불러오지 못했다. 다시 시도해달라." });
       }
     })();
-  }, [resumeExamId]);
+  }, [resumeExamId, questionRepository]);
 
   async function start(value: PracticeSetupValue) {
     setPhase({ kind: "loading" });

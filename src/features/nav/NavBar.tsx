@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CertSelector } from "./CertSelector";
 
 const LINKS = [
   { href: "/", label: "홈" },
@@ -15,17 +16,20 @@ export function NavBar() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-4 px-6 py-3 border-b text-sm">
-      {LINKS.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          aria-current={pathname === link.href ? "page" : undefined}
-          className={pathname === link.href ? "font-bold" : "text-gray-500"}
-        >
-          {link.label}
-        </Link>
-      ))}
+    <nav className="flex items-center justify-between gap-4 px-6 py-3 border-b text-sm">
+      <div className="flex gap-4">
+        {LINKS.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            aria-current={pathname === link.href ? "page" : undefined}
+            className={pathname === link.href ? "font-bold" : "text-gray-500"}
+          >
+            {link.label}
+          </Link>
+        ))}
+      </div>
+      <CertSelector />
     </nav>
   );
 }

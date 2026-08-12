@@ -1,16 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { listExamSessions, scoreExamSession } from "@/lib/latestExamResult";
+import { getSelectedCertId } from "@/lib/cert";
 import type { SubjectScore } from "@/lib/summary";
 import { SUBJECT_NAMES } from "@/lib/theory";
 import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
-const questionRepository = new JsonQuestionRepository();
 
 interface CbtResult {
   sessionId: string;
@@ -78,6 +78,7 @@ function CbtCard({ result: r }: { result: CbtResult }) {
 }
 
 export default function DashboardPage() {
+  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [cbtResults, setCbtResults] = useState<CbtResult[] | null>(null);
@@ -117,7 +118,7 @@ export default function DashboardPage() {
         console.error("CBT 결과 목록 계산 실패:", err);
         setCbtError(true);
       });
-  }, []);
+  }, [questionRepository]);
 
   if (error) {
     return (

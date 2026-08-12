@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { pickResumeExamId } from "@/lib/resumeExam";
+import { getSelectedCertId } from "@/lib/cert";
 import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
-const questionRepository = new JsonQuestionRepository();
 
 function formatPercent(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
 export default function HomePage() {
+  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [resumeExam, setResumeExam] = useState<{ examId: string; title: string } | null>(null);
@@ -35,7 +36,7 @@ export default function HomePage() {
         setResumeExam(resumeExamId && resumeExamEntry ? { examId: resumeExamId, title: resumeExamEntry.title } : null);
       })
       .catch((err) => console.error("이어서풀기 대상 계산 실패:", err));
-  }, []);
+  }, [questionRepository]);
 
   if (error) {
     return (

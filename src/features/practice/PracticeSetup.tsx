@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { computeExamStatuses, type ExamStatus } from "@/lib/examStatus";
 import { SUBJECT_NAMES } from "@/lib/theory";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
+import { getSelectedCertId } from "@/lib/cert";
 import type { Mode } from "@/types/progress";
 import type { ExamSummary } from "@/types/question";
 
@@ -27,7 +28,6 @@ interface PracticeSetupProps {
   initialTimeLimitMs?: number | null;
 }
 
-const questionRepository = new JsonQuestionRepository();
 const progressRepository = new IndexedDbProgressRepository();
 
 const TIME_LIMIT_OPTIONS: { label: string; value: number | null }[] = [
@@ -51,6 +51,7 @@ export function PracticeSetup({
   initialCount,
   initialTimeLimitMs,
 }: PracticeSetupProps) {
+  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
   const [mode, setMode] = useState<Mode>(initialMode ?? "study");
   const [entryType, setEntryType] = useState<"random" | "round">(initialEntryType ?? "random");
   const [subject, setSubject] = useState<number | "all">(initialSubject ?? "all");
@@ -71,7 +72,7 @@ export function PracticeSetup({
         setExams([]);
       }
     );
-  }, []);
+  }, [questionRepository]);
 
   function handleStart() {
     const effectiveTimeLimitMs = mode === "exam" ? timeLimitMs : null;

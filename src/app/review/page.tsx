@@ -1,22 +1,23 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ReviewList } from "@/features/review/ReviewList";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
 import { tryParseQuestionId } from "@/lib/questionId";
+import { SUBJECT_NAMES } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
-import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import { JsonQuestionRepository, type QuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { getSelectedCertId } from "@/lib/cert";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
-const questionRepository = new JsonQuestionRepository();
 const progressRepository = new IndexedDbProgressRepository();
 const settingsRepository = new IndexedDbSettingsRepository();
 
@@ -40,7 +41,7 @@ const EMPTY_MESSAGE: Record<Tab, string> = {
   recent: "최근 푼 문제가 없다.",
 };
 
-async function hydrate(questionIds: string[]): Promise<Question[]> {
+async function hydrate(questionRepository: QuestionRepository, questionIds: string[]): Promise<Question[]> {
   const results = await Promise.allSettled(
     questionIds.map((id) => questionRepository.getQuestion(id))
   );
@@ -50,6 +51,7 @@ async function hydrate(questionIds: string[]): Promise<Question[]> {
 }
 
 async function fetchTabQuestions(
+  questionRepository: QuestionRepository,
   nextTab: Tab
 ): Promise<{ questions: Question[]; wrongNotesById: Map<string, WrongNote>; modeById: Map<string, Mode> }> {
   let questionIds: string[];
@@ -76,11 +78,12 @@ async function fetchTabQuestions(
     questionIds = getAllSolvedQuestionIds(attempts);
   }
 
-  const questions = await hydrate(questionIds);
+  const questions = await hydrate(questionRepository, questionIds);
   return { questions, wrongNotesById, modeById };
 }
 
 function ReviewContent() {
+  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
   const [tab, setTab] = useState<Tab>("wrong");
   const [phase, setPhase] = useState<Phase>({ kind: "list" });
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -99,6 +102,7 @@ function ReviewContent() {
     return m === "study" || m === "exam" ? m : "all";
   });
   const [roundFilter, setRoundFilter] = useState<string>(() => searchParams.get("examId") ?? "all");
+  const [subjectFilter, setSubjectFilter] = useState<string>(() => searchParams.get("subject") ?? "all");
 
   const filteredQuestions =
     tab === "wrong"
@@ -106,6 +110,7 @@ function ReviewContent() {
           const note = wrongNotesById.get(q.questionId);
           if (modeFilter !== "all" && note?.mode !== modeFilter) return false;
           if (roundFilter !== "all" && tryParseQuestionId(q.questionId)?.examId !== roundFilter) return false;
+          if (subjectFilter !== "all" && String(q.subject) !== subjectFilter) return false;
           return true;
         })
       : questions;
@@ -121,12 +126,15 @@ function ReviewContent() {
         ].sort((a, b) => b.localeCompare(a))
       : [];
 
+  const availableSubjects =
+    tab === "wrong" ? [...new Set(questions.map((q) => q.subject))].sort((a, b) => a - b) : [];
+
   // Reusable for imperative reloads (e.g. the "복습 목록으로" button) — never referenced
   // from the effect below, since react-hooks/set-state-in-effect flags any effect that
   // captures a function which itself calls a state setter, however deep.
   function loadTab(nextTab: Tab) {
     const requestId = ++latestRequestId.current;
-    fetchTabQuestions(nextTab).then(
+    fetchTabQuestions(questionRepository, nextTab).then(
       ({ questions: hydrated, wrongNotesById: notes, modeById: modes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
@@ -147,7 +155,7 @@ function ReviewContent() {
 
   useEffect(() => {
     const requestId = ++latestRequestId.current;
-    fetchTabQuestions(tab).then(
+    fetchTabQuestions(questionRepository, tab).then(
       ({ questions: hydrated, wrongNotesById: notes, modeById: modes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
@@ -164,7 +172,7 @@ function ReviewContent() {
         setLoadedTab(tab);
       }
     );
-  }, [tab]);
+  }, [tab, questionRepository]);
 
   async function handleRemove(questionId: string) {
     const removingFromTab = tab;
@@ -299,6 +307,18 @@ function ReviewContent() {
               </option>
             ))}
           </select>
+          <select
+            value={subjectFilter}
+            onChange={(e) => setSubjectFilter(e.target.value)}
+            className="px-2 py-1.5 rounded border text-sm"
+          >
+            <option value="all">전체 과목</option>
+            {availableSubjects.map((subject) => (
+              <option key={subject} value={subject}>
+                {SUBJECT_NAMES[subject]}
+              </option>
+            ))}
+          </select>
         </div>
       )}
       {loading ? (
@@ -309,20 +329,22 @@ function ReviewContent() {
           emptyMessage={EMPTY_MESSAGE[tab]}
           onRemove={tab === "recent" ? undefined : handleRemove}
           onRetry={handleRetry}
-          metaFor={(id) => {
+          metaFor={(question) => {
+            const id = question.questionId;
             const examId = tryParseQuestionId(id)?.examId;
             const mode = tab === "wrong" ? wrongNotesById.get(id)?.mode : modeById.get(id);
             const modeLabel = mode === "exam" ? "시험모드" : mode === "study" ? "학습모드" : null;
+            const subjectLabel = SUBJECT_NAMES[question.subject];
 
             if (tab === "wrong") {
               const note = wrongNotesById.get(id);
               if (!note) return null;
               const date = new Date(note.addedAt).toLocaleDateString("ko-KR");
-              const rest = [examId, modeLabel].filter(Boolean).join(" · ");
+              const rest = [examId, modeLabel, subjectLabel].filter(Boolean).join(" · ");
               return rest ? `${date} · ${rest}` : date;
             }
-            if (!examId) return modeLabel;
-            return modeLabel ? `${examId} · ${modeLabel}` : examId;
+            const rest = [examId, modeLabel, subjectLabel].filter(Boolean).join(" · ");
+            return rest || null;
           }}
         />
       )}
