@@ -41,10 +41,12 @@ function formatDateTime(ts: number): string {
 }
 
 function CbtCard({ result: r }: { result: CbtResult }) {
-  // 이 회차를 응시했을 때 실제로 틀리거나(또는 안 푼) 문항 수 — 그 세션의 attempts로만
-  // 계산되므로, 이후 오답노트에서 재도전해 맞히더라도 이 숫자는 절대 바뀌지 않는다.
-  // 오답노트 상태(wrongNotes)에 의존하면 재도전 결과에 따라 계속 흔들리게 된다.
-  const wrongCount = r.total - r.correct;
+  // 실제로 답했는데 틀린 문항 수만 센다(안 푼 문항은 제외) — submitExam()의
+  // addWrongNote()도 답한 것 중 틀린 것만 오답노트에 넣으므로, 이 배지를 눌러
+  // 이동하는 오답노트 화면의 실제 문항수와 일치시키려면 여기서도 같은 기준이어야
+  // 한다. total - correct로 계산하면 안 푼 문항까지 오답으로 잡혀 오답노트 개수와
+  // 어긋나고, 미완료 회차를 이어서 풀수록(#47) 숫자가 계속 바뀌어 보인다.
+  const wrongCount = r.solved - r.correct;
   return (
     <div className="p-4 rounded border flex flex-col gap-2">
       <div className="flex justify-between items-baseline">
