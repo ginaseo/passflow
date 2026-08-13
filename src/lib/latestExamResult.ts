@@ -1,4 +1,4 @@
-import { parseQuestionId } from "./questionId";
+import { tryParseQuestionId } from "./questionId";
 import { isPassed, type SubjectScore } from "./summary";
 import type { Attempt } from "@/types/progress";
 import type { Question } from "@/types/question";
@@ -12,7 +12,9 @@ export function listExamSessions(
 
   const bySession = new Map<string, { examId: string; solvedAt: number }>();
   for (const a of examAttempts) {
-    const { examId } = parseQuestionId(a.questionId);
+    const parsed = tryParseQuestionId(a.questionId);
+    if (!parsed) continue; // 손상된 백업 데이터의 questionId는 건너뛴다
+    const { examId } = parsed;
     const existing = bySession.get(a.sessionId);
     if (!existing || a.solvedAt > existing.solvedAt) {
       bySession.set(a.sessionId, { examId, solvedAt: a.solvedAt });
@@ -33,7 +35,9 @@ export function scoreExamSession(
   const byQnum = new Map<number, Attempt>();
   for (const a of attempts) {
     if (a.mode !== "exam" || a.sessionId !== sessionId) continue;
-    const { examId: attemptExamId, qnum } = parseQuestionId(a.questionId);
+    const parsed = tryParseQuestionId(a.questionId);
+    if (!parsed) continue; // 손상된 백업 데이터의 questionId는 건너뛴다
+    const { examId: attemptExamId, qnum } = parsed;
     if (attemptExamId !== examId) continue;
     const prev = byQnum.get(qnum);
     if (!prev || a.solvedAt > prev.solvedAt) byQnum.set(qnum, a);
@@ -78,7 +82,9 @@ export function getExamSessionWrongQuestionIds(
   const byQnum = new Map<number, Attempt>();
   for (const a of attempts) {
     if (a.mode !== "exam" || a.sessionId !== sessionId) continue;
-    const { examId: attemptExamId, qnum } = parseQuestionId(a.questionId);
+    const parsed = tryParseQuestionId(a.questionId);
+    if (!parsed) continue; // 손상된 백업 데이터의 questionId는 건너뛴다
+    const { examId: attemptExamId, qnum } = parsed;
     if (attemptExamId !== examId) continue;
     const prev = byQnum.get(qnum);
     if (!prev || a.solvedAt > prev.solvedAt) byQnum.set(qnum, a);

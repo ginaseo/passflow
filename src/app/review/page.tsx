@@ -78,10 +78,12 @@ async function fetchTabQuestions(
     const wrongNotesById = new Map<string, WrongNote>();
 
     for (const examId of targetExamIds) {
-      const session =
-        (sessionIdFilter && roundFilter !== "all"
-          ? sessions.find((item) => item.examId === examId && item.sessionId === sessionIdFilter)
-          : null) ?? sessions.find((item) => item.examId === examId);
+      // sessionIdFilter가 있으면 roundFilter 값과 무관하게 그 세션만 고른다 — 대시보드
+      // 딥링크(examId+sessionId)로 들어온 뒤 회차 드롭다운을 "전체"로 바꿔도(URL의
+      // sessionId는 그대로 남는다) 엉뚱한 회차의 최신 세션이 섞여 나오지 않게 한다.
+      const session = sessionIdFilter
+        ? sessions.find((item) => item.examId === examId && item.sessionId === sessionIdFilter)
+        : sessions.find((item) => item.examId === examId);
       if (!session) continue;
 
       const examQuestions = await questionRepository.getQuestions({ examId });
