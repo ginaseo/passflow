@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { CertSelector } from "@/features/nav/CertSelector";
 import { parseBackup, serializeBackup } from "@/lib/backup";
 import { readAutoBackup } from "@/lib/autoBackup";
 import { isStorageFallbackActive } from "@/repositories/storageFallback";
@@ -155,6 +156,11 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6 max-w-md mx-auto p-6">
       <h1 className="text-xl font-bold">설정</h1>
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium">자격증</span>
+        <CertSelector />
+      </div>
 
       <div className="flex flex-col gap-2">
         <span className="font-medium">학습</span>

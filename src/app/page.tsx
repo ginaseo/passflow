@@ -1,41 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { pickResumeExamId } from "@/lib/resumeExam";
+import { getSelectedCertId } from "@/lib/cert";
+import { computeDashboardSummary, scopeAttemptsToExams } from "@/lib/dashboardSummary";
 import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
-const questionRepository = new JsonQuestionRepository();
 
 function formatPercent(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
 export default function HomePage() {
+  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [resumeExam, setResumeExam] = useState<{ examId: string; title: string } | null>(null);
 
   useEffect(() => {
-    progressRepository.getDashboardSummary().then(
-      (result) => setSummary(result),
-      (err) => {
-        console.error("getDashboardSummary failed:", err);
-        setError(true);
-      }
-    );
-
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()])
       .then(([exams, attempts]) => {
-        const resumeExamId = pickResumeExamId(exams, attempts);
+        const scopedAttempts = scopeAttemptsToExams(attempts, exams);
+
+        setSummary(computeDashboardSummary(scopedAttempts));
+
+        const resumeExamId = pickResumeExamId(exams, scopedAttempts);
         const resumeExamEntry = resumeExamId ? exams.find((e) => e.examId === resumeExamId) : undefined;
         setResumeExam(resumeExamId && resumeExamEntry ? { examId: resumeExamId, title: resumeExamEntry.title } : null);
       })
-      .catch((err) => console.error("이어서풀기 대상 계산 실패:", err));
-  }, []);
+      .catch((err) => {
+        console.error("대시보드 데이터 계산 실패:", err);
+        setError(true);
+      });
+  }, [questionRepository]);
 
   if (error) {
     return (
@@ -80,7 +81,7 @@ export default function HomePage() {
           학습모드
         </Link>
         <Link
-          href="/practice?mode=exam&entry=round&limit=150"
+          href="/practice?mode=exam&entry=round"
           className="px-4 py-2 rounded border font-medium text-center"
         >
           시험모드

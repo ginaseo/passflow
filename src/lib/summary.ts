@@ -29,6 +29,7 @@ export function summarizeSession(
 
 export interface SubjectScore {
   subject: number;
+  subjectName?: string;
   total: number;
   correct: number;
 }
@@ -42,6 +43,7 @@ export function summarizeBySubject(
   questions.forEach((question, i) => {
     const score = bySubject.get(question.subject) ?? {
       subject: question.subject,
+      subjectName: question.subjectName,
       total: 0,
       correct: 0,
     };

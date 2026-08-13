@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { listExamSessions, scoreExamSession } from "@/lib/latestExamResult";
+import { getSelectedCertId } from "@/lib/cert";
+import { computeDashboardSummary, scopeAttemptsToExams } from "@/lib/dashboardSummary";
 import type { SubjectScore } from "@/lib/summary";
-import { SUBJECT_NAMES } from "@/lib/theory";
+import { getSubjectLabel } from "@/lib/theory";
 import type { DashboardSummary } from "@/types/progress";
 
 const progressRepository = new IndexedDbProgressRepository();
-const questionRepository = new JsonQuestionRepository();
 
 interface CbtResult {
   sessionId: string;
@@ -39,9 +40,11 @@ function formatDateTime(ts: number): string {
 }
 
 function CbtCard({ result: r }: { result: CbtResult }) {
-  // 이 회차를 응시했을 때 실제로 틀리거나(또는 안 푼) 문항 수 — 그 세션의 attempts로만
-  // 계산되므로, 이후 오답노트에서 재도전해 맞히더라도 이 숫자는 절대 바뀌지 않는다.
-  // 오답노트 상태(wrongNotes)에 의존하면 재도전 결과에 따라 계속 흔들리게 된다.
+  // 실제로 답했는데 틀린 문항 수만 센다(안 푼 문항은 제외) — submitExam()의
+  // addWrongNote()도 답한 것 중 틀린 것만 오답노트에 넣으므로, 이 배지를 눌러
+  // 이동하는 오답노트 화면의 실제 문항수와 일치시키려면 여기서도 같은 기준이어야
+  // 한다. total - correct로 계산하면 안 푼 문항까지 오답으로 잡혀 오답노트 개수와
+  // 어긋나고, 미완료 회차를 이어서 풀수록(#47) 숫자가 계속 바뀌어 보인다.
   const wrongCount = r.total - r.correct;
   return (
     <div className="p-4 rounded border flex flex-col gap-2">
@@ -61,13 +64,13 @@ function CbtCard({ result: r }: { result: CbtResult }) {
       <ul className="text-sm text-gray-600 grid grid-cols-2 gap-x-4 gap-y-1">
         {r.subjectScores.map((s) => (
           <li key={s.subject}>
-            {SUBJECT_NAMES[s.subject]}: {s.correct}/{s.total}
+            {getSubjectLabel({ subject: s.subject, subjectName: s.subjectName })}: {s.correct}/{s.total}
           </li>
         ))}
       </ul>
       {wrongCount > 0 && (
         <Link
-          href={`/review?examId=${encodeURIComponent(r.examId)}&mode=exam`}
+          href={`/review?examId=${encodeURIComponent(r.examId)}&sessionId=${encodeURIComponent(r.sessionId)}&mode=exam`}
           className="self-start text-sm text-blue-700 underline"
         >
           오답 다시풀기 ({wrongCount}문제)
@@ -78,6 +81,7 @@ function CbtCard({ result: r }: { result: CbtResult }) {
 }
 
 export default function DashboardPage() {
+  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [cbtResults, setCbtResults] = useState<CbtResult[] | null>(null);
@@ -85,16 +89,12 @@ export default function DashboardPage() {
   const [showAllCbt, setShowAllCbt] = useState(false);
 
   useEffect(() => {
-    progressRepository.getDashboardSummary().then(
-      (result) => setSummary(result),
-      (err) => {
-        console.error("getDashboardSummary failed:", err);
-        setError(true);
-      }
-    );
-
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()])
       .then(async ([exams, attempts]) => {
+        // CBT 응시 기록 목록은 exams.find(...)가 이미 자연스럽게 자격증별로 걸러주므로
+        // 그대로 둔다 — 상단 통계만 scopeAttemptsToExams로 별도 필터링한다.
+        setSummary(computeDashboardSummary(scopeAttemptsToExams(attempts, exams)));
+
         const sessions = listExamSessions(attempts);
         const results = await Promise.all(
           sessions.map(async ({ examId, sessionId, solvedAt }) => {
@@ -114,10 +114,11 @@ export default function DashboardPage() {
         setCbtResults(results.filter((r): r is CbtResult => r !== null));
       })
       .catch((err) => {
-        console.error("CBT 결과 목록 계산 실패:", err);
+        console.error("대시보드 데이터 계산 실패:", err);
+        setError(true);
         setCbtError(true);
       });
-  }, []);
+  }, [questionRepository]);
 
   if (error) {
     return (

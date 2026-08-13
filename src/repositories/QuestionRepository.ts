@@ -33,23 +33,26 @@ export class JsonQuestionRepository implements QuestionRepository {
   private indexCache: Promise<ExamSummary[]> | null = null;
   private theoryMapCache: Promise<TheoryMap> | null = null;
 
+  constructor(private readonly certId: string) {}
+
   private loadExam(examId: string): Promise<Question[]> {
     let cached = this.examCache.get(examId);
     if (!cached) {
-      cached = fetch(`/data/exam_${examId}.json`)
+      cached = fetch(`/data/${this.certId}/exam_${examId}.json`)
         .then((res) => res.json() as Promise<RawExam>)
         .then((raw) =>
           raw.questions.map(
             (q): Question => ({
-              questionId: makeQuestionId(raw.examId, q.qnum),
+              questionId: makeQuestionId(this.certId, raw.examId, q.qnum),
               examId: raw.examId,
               qnum: q.qnum,
               stem: q.stem,
               options: q.options,
               subject: q.subject,
+              subjectName: q.subjectName,
               answer: q.answer,
               explanation: q.explanation,
-              image: q.image,
+              image: q.image ? `${this.certId}/${q.image}` : null,
               sinagong: q.sinagong,
               table: q.table,
             })
@@ -66,7 +69,7 @@ export class JsonQuestionRepository implements QuestionRepository {
 
   private loadIndex(): Promise<ExamSummary[]> {
     if (!this.indexCache) {
-      this.indexCache = fetch("/data/exams_index.json")
+      this.indexCache = fetch(`/data/${this.certId}/exams_index.json`)
         .then((res) => res.json() as Promise<ExamSummary[]>)
         .catch((err) => {
           this.indexCache = null;
@@ -78,11 +81,12 @@ export class JsonQuestionRepository implements QuestionRepository {
 
   async getTheoryMap(): Promise<TheoryMap> {
     if (!this.theoryMapCache) {
-      this.theoryMapCache = fetch("/data/theory_map.json")
+      this.theoryMapCache = fetch(`/data/${this.certId}/theory_map.json`)
         .then((res) => res.json() as Promise<TheoryMap>)
         .catch((err) => {
-          this.theoryMapCache = null;
-          throw err;
+          console.warn("Failed to load theory_map.json; continuing with an empty map.", err);
+          this.theoryMapCache = Promise.resolve({});
+          return {};
         });
     }
     return this.theoryMapCache;

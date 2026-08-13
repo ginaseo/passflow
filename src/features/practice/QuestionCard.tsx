@@ -1,7 +1,7 @@
 "use client";
 
 import { isCorrectOption } from "@/lib/grading";
-import { SUBJECT_NAMES } from "@/lib/theory";
+import { getSubjectLabel } from "@/lib/theory";
 import type { Question } from "@/types/question";
 import type { TheoryLink } from "@/types/theory";
 
@@ -35,7 +35,7 @@ export function QuestionCard({
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
       <div className="flex items-center justify-between text-sm text-gray-500">
         <span>
-          {index + 1} / {total} · {SUBJECT_NAMES[question.subject]}
+          {index + 1} / {total} · {getSubjectLabel(question)}
         </span>
         <button type="button" onClick={onFavorite} className="text-yellow-600">
           {isFavorited ? "★ 즐겨찾기 완료" : "☆ 즐겨찾기"}

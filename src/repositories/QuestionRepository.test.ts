@@ -75,38 +75,38 @@ beforeEach(() => {
 
 describe("JsonQuestionRepository", () => {
   it("getQuestion은 examId-Qqnum 형식을 파싱해 해당 문항을 questionId·examId를 채워 반환한다", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     const q = await repo.getQuestion("2023-1-Q2");
 
     expect(q.questionId).toBe("2023-1-Q2");
     expect(q.examId).toBe("2023-1");
     expect(q.stem).toBe("2번 문항");
     expect(q.sinagong).toBe("075");
-    expect(fetch).toHaveBeenCalledWith("/data/exam_2023-1.json");
+    expect(fetch).toHaveBeenCalledWith("/data/jcg/exam_2023-1.json");
   });
 
   it("getQuestions({ examId })는 해당 회차 문항만 반환한다", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     const qs = await repo.getQuestions({ examId: "2023-1" });
     expect(qs).toHaveLength(2);
     expect(qs[0].questionId).toBe("2023-1-Q1");
   });
 
   it("getQuestions({ examId, subject })는 회차 내 과목까지 필터링한다", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     const qs = await repo.getQuestions({ examId: "2023-1", subject: 2 });
     expect(qs).toHaveLength(1);
     expect(qs[0].questionId).toBe("2023-1-Q2");
   });
 
   it("getQuestions({ subject })만 주어지면 exams_index를 읽어 전체 회차를 뒤진다", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     const qs = await repo.getQuestions({ subject: 1 });
     expect(qs.map((q) => q.questionId).sort()).toEqual(["2023-1-Q1", "2023-2-Q1"]);
   });
 
   it("같은 회차를 두 번 요청해도 fetch는 한 번만 일어난다 (캐시)", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     await repo.getQuestions({ examId: "2023-1" });
     await repo.getQuestions({ examId: "2023-1" });
     const examFetchCalls = (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
@@ -116,7 +116,7 @@ describe("JsonQuestionRepository", () => {
   });
 
   it("loadExam의 fetch가 실패해도 캐시에 남지 않아 재시도 시 다시 fetch한다", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     const mockFetch = vi.fn(mockFetchJson);
     mockFetch.mockRejectedValueOnce(new Error("network error"));
     vi.stubGlobal("fetch", mockFetch);
@@ -129,7 +129,7 @@ describe("JsonQuestionRepository", () => {
   });
 
   it("loadIndex의 fetch가 실패해도 캐시에 남지 않아 재시도 시 다시 fetch한다", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     const mockFetch = vi.fn(mockFetchJson);
     mockFetch.mockRejectedValueOnce(new Error("network error"));
     vi.stubGlobal("fetch", mockFetch);
@@ -142,14 +142,14 @@ describe("JsonQuestionRepository", () => {
   });
 
   it("getTheoryMap은 /data/theory_map.json을 fetch해서 반환한다", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     const map = await repo.getTheoryMap();
     expect(map["075"].name).toBe("스택(Stack)");
-    expect(fetch).toHaveBeenCalledWith("/data/theory_map.json");
+    expect(fetch).toHaveBeenCalledWith("/data/jcg/theory_map.json");
   });
 
   it("getTheoryMap을 두 번 불러도 fetch는 한 번만 일어난다 (캐시)", async () => {
-    const repo = new JsonQuestionRepository();
+    const repo = new JsonQuestionRepository("jcg");
     await repo.getTheoryMap();
     await repo.getTheoryMap();
     const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([url]) =>
@@ -158,16 +158,17 @@ describe("JsonQuestionRepository", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("getTheoryMap의 fetch가 실패해도 캐시에 남지 않아 재시도 시 다시 fetch한다", async () => {
-    const repo = new JsonQuestionRepository();
+  it("getTheoryMap의 fetch가 실패하면 예외 대신 빈 맵으로 폴백하고, 그 결과를 캐시한다", async () => {
+    const repo = new JsonQuestionRepository("jcg");
     const mockFetch = vi.fn(mockFetchJson);
     mockFetch.mockRejectedValueOnce(new Error("network error"));
     vi.stubGlobal("fetch", mockFetch);
 
-    await expect(repo.getTheoryMap()).rejects.toThrow("network error");
-
     const map = await repo.getTheoryMap();
-    expect(map["075"].name).toBe("스택(Stack)");
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(map).toEqual({});
+
+    const mapAgain = await repo.getTheoryMap();
+    expect(mapAgain).toEqual({});
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

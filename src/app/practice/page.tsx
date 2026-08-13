@@ -1,24 +1,25 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/PracticeSetup";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { AnswerGrid } from "@/features/practice/AnswerGrid";
 import { pickRandomQuestions, pickStratifiedRandomQuestions } from "@/lib/sampling";
+import { getSubjectWeights } from "@/lib/examSubjectWeights";
 import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
-import { SUBJECT_NAMES } from "@/lib/theory";
+import { getSubjectLabel } from "@/lib/theory";
 import { getUnansweredQuestions, pickResumeSession } from "@/lib/resumeExam";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
+import { getSelectedCertId } from "@/lib/cert";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { EntryType, Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
-const questionRepository = new JsonQuestionRepository();
 const progressRepository = new IndexedDbProgressRepository();
 const settingsRepository = new IndexedDbSettingsRepository();
 
@@ -41,6 +42,8 @@ type Phase =
   | { kind: "error"; message: string };
 
 function PracticeContent() {
+  const certId = useMemo(() => getSelectedCertId(), []);
+  const questionRepository = useMemo(() => new JsonQuestionRepository(certId), [certId]);
   const searchParams = useSearchParams();
   const resumeExamId = searchParams.get("resume");
   const [phase, setPhase] = useState<Phase>(resumeExamId ? { kind: "loading" } : { kind: "setup" });
@@ -57,21 +60,14 @@ function PracticeContent() {
   const initialSubject: number | "all" | undefined =
     subjectParam === "all"
       ? "all"
-      : subjectParam && Number.isInteger(subjectNum) && subjectNum in SUBJECT_NAMES
+      : subjectParam && Number.isInteger(subjectNum) && subjectNum > 0
         ? subjectNum
         : undefined;
 
   const countParam = searchParams.get("count");
-  const initialCount: 20 | 40 | 100 | undefined =
-    countParam === "20" || countParam === "40" || countParam === "100" ? (Number(countParam) as 20 | 40 | 100) : undefined;
-
-  const limitParam = searchParams.get("limit");
-  const limitMinutes = Number(limitParam);
-  const limitMs = limitMinutes * 60 * 1000;
-  const initialTimeLimitMs: number | undefined =
-    limitParam && Number.isFinite(limitMinutes) && limitMinutes > 0 && Number.isFinite(limitMs)
-      ? limitMs
-      : undefined;
+  const countNum = Number(countParam);
+  const initialCount: number | undefined =
+    countParam && Number.isInteger(countNum) && countNum > 0 ? countNum : undefined;
 
   // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
   // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가
@@ -166,7 +162,7 @@ function PracticeContent() {
         setPhase({ kind: "error", message: "이어서 풀 문항을 불러오지 못했다. 다시 시도해달라." });
       }
     })();
-  }, [resumeExamId]);
+  }, [resumeExamId, questionRepository]);
 
   async function start(value: PracticeSetupValue) {
     setPhase({ kind: "loading" });
@@ -188,7 +184,7 @@ function PracticeContent() {
         );
         questions =
           value.subject === "all"
-            ? pickStratifiedRandomQuestions(pool, value.count)
+            ? pickStratifiedRandomQuestions(pool, value.count, Math.random, getSubjectWeights(certId))
             : pickRandomQuestions(pool, value.count);
       }
 
@@ -238,12 +234,13 @@ function PracticeContent() {
   if (phase.kind === "setup") {
     return (
       <PracticeSetup
+        questionRepository={questionRepository}
+        certId={certId}
         onStart={start}
         initialEntryType={initialEntryType}
         initialMode={initialMode}
         initialSubject={initialSubject}
         initialCount={initialCount}
-        initialTimeLimitMs={initialTimeLimitMs}
       />
     );
   }
@@ -290,7 +287,7 @@ function PracticeContent() {
             <ul className="text-sm text-left flex flex-col gap-1">
               {subjectScores.map((score) => (
                 <li key={score.subject} className={isSubjectFailed(score) ? "text-red-700" : ""}>
-                  {SUBJECT_NAMES[score.subject]}: {score.correct}/{score.total}
+                  {getSubjectLabel(score)}: {score.correct}/{score.total}
                   {isSubjectFailed(score) ? " (과락)" : ""}
                 </li>
               ))}
