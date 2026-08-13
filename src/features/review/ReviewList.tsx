@@ -8,7 +8,7 @@ interface ReviewListProps {
   emptyMessage: string;
   onRemove?: (questionId: string) => void;
   onRetry: (questions: Question[]) => void;
-  metaFor?: (questionId: string) => string | null;
+  metaFor?: (question: Question) => string | null;
 }
 
 export function ReviewList({ questions, emptyMessage, onRemove, onRetry, metaFor }: ReviewListProps) {
@@ -65,8 +65,8 @@ export function ReviewList({ questions, emptyMessage, onRemove, onRetry, metaFor
               className="text-sm flex-1 min-w-0 cursor-pointer"
             >
               <span className="block truncate">{question.stem}</span>
-              {metaFor?.(question.questionId) && (
-                <span className="block text-xs text-gray-400">{metaFor(question.questionId)}</span>
+              {metaFor?.(question) && (
+                <span className="block text-xs text-gray-400">{metaFor(question)}</span>
               )}
             </span>
             {onRemove && (

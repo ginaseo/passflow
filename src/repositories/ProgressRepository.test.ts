@@ -209,6 +209,14 @@ describe("IndexedDbProgressRepository", () => {
     expect(notes[0].mode).toBe("exam");
   });
 
+  it("getWrongNote는 특정 questionId의 오답노트를 반환하고, 없으면 null을 반환한다", async () => {
+    const repo = new IndexedDbProgressRepository();
+    await repo.addWrongNote("Q1", "exam");
+
+    expect((await repo.getWrongNote("Q1"))?.mode).toBe("exam");
+    expect(await repo.getWrongNote("Q2")).toBeNull();
+  });
+
   it("getDashboardSummary는 오늘/전체 정답률을 계산한다", async () => {
     const repo = new IndexedDbProgressRepository();
     const oneDayMs = 24 * 60 * 60 * 1000;
