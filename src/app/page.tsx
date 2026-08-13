@@ -81,7 +81,7 @@ export default function HomePage() {
           학습모드
         </Link>
         <Link
-          href="/practice?mode=exam&entry=round&limit=150"
+          href="/practice?mode=exam&entry=round"
           className="px-4 py-2 rounded border font-medium text-center"
         >
           시험모드

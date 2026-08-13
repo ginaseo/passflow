@@ -41,7 +41,8 @@ type Phase =
   | { kind: "error"; message: string };
 
 function PracticeContent() {
-  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
+  const certId = useMemo(() => getSelectedCertId(), []);
+  const questionRepository = useMemo(() => new JsonQuestionRepository(certId), [certId]);
   const searchParams = useSearchParams();
   const resumeExamId = searchParams.get("resume");
   const [phase, setPhase] = useState<Phase>(resumeExamId ? { kind: "loading" } : { kind: "setup" });
@@ -65,14 +66,6 @@ function PracticeContent() {
   const countParam = searchParams.get("count");
   const initialCount: 20 | 40 | 100 | undefined =
     countParam === "20" || countParam === "40" || countParam === "100" ? (Number(countParam) as 20 | 40 | 100) : undefined;
-
-  const limitParam = searchParams.get("limit");
-  const limitMinutes = Number(limitParam);
-  const limitMs = limitMinutes * 60 * 1000;
-  const initialTimeLimitMs: number | undefined =
-    limitParam && Number.isFinite(limitMinutes) && limitMinutes > 0 && Number.isFinite(limitMs)
-      ? limitMs
-      : undefined;
 
   // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
   // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가
@@ -240,12 +233,12 @@ function PracticeContent() {
     return (
       <PracticeSetup
         questionRepository={questionRepository}
+        certId={certId}
         onStart={start}
         initialEntryType={initialEntryType}
         initialMode={initialMode}
         initialSubject={initialSubject}
         initialCount={initialCount}
-        initialTimeLimitMs={initialTimeLimitMs}
       />
     );
   }

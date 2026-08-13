@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { computeExamStatuses, type ExamStatus } from "@/lib/examStatus";
 import { getSubjectLabel } from "@/lib/theory";
+import { computeExamTimeLimitMs } from "@/lib/examTimeLimit";
 import type { QuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import type { Mode } from "@/types/progress";
@@ -20,22 +21,15 @@ export type PracticeSetupValue =
 
 interface PracticeSetupProps {
   questionRepository: QuestionRepository;
+  certId: string;
   onStart: (value: PracticeSetupValue) => void;
   initialEntryType?: "random" | "round";
   initialMode?: Mode;
   initialSubject?: number | "all";
   initialCount?: 20 | 40 | 100;
-  initialTimeLimitMs?: number | null;
 }
 
 const progressRepository = new IndexedDbProgressRepository();
-
-const TIME_LIMIT_OPTIONS: { label: string; value: number | null }[] = [
-  { label: "제한없음", value: null },
-  { label: "30분", value: 30 * 60 * 1000 },
-  { label: "60분", value: 60 * 60 * 1000 },
-  { label: "150분(실전)", value: 150 * 60 * 1000 },
-];
 
 const STATUS_STYLE: Record<ExamStatus, string> = {
   미응시: "text-gray-400",
@@ -45,18 +39,17 @@ const STATUS_STYLE: Record<ExamStatus, string> = {
 
 export function PracticeSetup({
   questionRepository,
+  certId,
   onStart,
   initialEntryType,
   initialMode,
   initialSubject,
   initialCount,
-  initialTimeLimitMs,
 }: PracticeSetupProps) {
   const [mode, setMode] = useState<Mode>(initialMode ?? "study");
   const [entryType, setEntryType] = useState<"random" | "round">(initialEntryType ?? "random");
   const [subject, setSubject] = useState<number | "all">(initialSubject ?? "all");
   const [count, setCount] = useState<20 | 40 | 100>(initialCount ?? 20);
-  const [timeLimitMs, setTimeLimitMs] = useState<number | null>(initialTimeLimitMs ?? null);
   const [examId, setExamId] = useState<string | null>(null);
   const [exams, setExams] = useState<ExamSummary[] | null>(null);
   const [statuses, setStatuses] = useState<Map<string, ExamStatus>>(new Map());
@@ -91,18 +84,25 @@ export function PracticeSetup({
     );
   }, [questionRepository]);
 
+  // 제한시간은 사용자가 고르지 않는다 — 자격증별 실제 시험의 문항당 배정 시간
+  // 비율로 항상 자동 계산한다(회차별은 그 회차의 실제 문항수 기준).
+  const roundQuestionCount = examId ? (exams?.find((e) => e.examId === examId)?.count ?? 0) : 0;
+  const autoTimeLimitMs =
+    mode === "exam"
+      ? computeExamTimeLimitMs(certId, entryType === "round" ? roundQuestionCount : count)
+      : null;
+
   function handleStart() {
-    const effectiveTimeLimitMs = mode === "exam" ? timeLimitMs : null;
     if (entryType === "round") {
       if (!examId) return;
-      onStart({ mode, entryType: "round", examId, timeLimitMs: effectiveTimeLimitMs });
+      onStart({ mode, entryType: "round", examId, timeLimitMs: autoTimeLimitMs });
     } else {
       onStart({
         mode,
         entryType: "random",
         subject,
         count,
-        timeLimitMs: effectiveTimeLimitMs,
+        timeLimitMs: autoTimeLimitMs,
       });
     }
   }
@@ -136,18 +136,13 @@ export function PracticeSetup({
       {mode === "exam" && (
         <div className="flex flex-col gap-2">
           <span className="font-medium">제한시간</span>
-          <div className="flex flex-wrap gap-2">
-            {TIME_LIMIT_OPTIONS.map((opt) => (
-              <button
-                key={opt.label}
-                type="button"
-                onClick={() => setTimeLimitMs(opt.value)}
-                className={`px-3 py-1.5 rounded border ${timeLimitMs === opt.value ? "bg-black text-white" : ""}`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <p className="text-sm text-gray-600">
+            {autoTimeLimitMs
+              ? `${Math.round(autoTimeLimitMs / 60000)}분 (문항수에 따라 자동 설정)`
+              : entryType === "round" && !examId
+                ? "회차를 선택하면 자동으로 정해진다."
+                : "제한없음"}
+          </p>
         </div>
       )}
 
