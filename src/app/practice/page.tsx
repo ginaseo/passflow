@@ -6,6 +6,7 @@ import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/Prac
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { AnswerGrid } from "@/features/practice/AnswerGrid";
 import { pickRandomQuestions, pickStratifiedRandomQuestions } from "@/lib/sampling";
+import { getSubjectWeights } from "@/lib/examSubjectWeights";
 import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
 import { getSubjectLabel } from "@/lib/theory";
@@ -64,8 +65,9 @@ function PracticeContent() {
         : undefined;
 
   const countParam = searchParams.get("count");
-  const initialCount: 20 | 40 | 100 | undefined =
-    countParam === "20" || countParam === "40" || countParam === "100" ? (Number(countParam) as 20 | 40 | 100) : undefined;
+  const countNum = Number(countParam);
+  const initialCount: number | undefined =
+    countParam && Number.isInteger(countNum) && countNum > 0 ? countNum : undefined;
 
   // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
   // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가
@@ -182,7 +184,7 @@ function PracticeContent() {
         );
         questions =
           value.subject === "all"
-            ? pickStratifiedRandomQuestions(pool, value.count)
+            ? pickStratifiedRandomQuestions(pool, value.count, Math.random, getSubjectWeights(certId))
             : pickRandomQuestions(pool, value.count);
       }
 

@@ -16,7 +16,8 @@ export function pickRandomQuestions(
 export function pickStratifiedRandomQuestions(
   questions: Question[],
   count: number,
-  rng: () => number = Math.random
+  rng: () => number = Math.random,
+  weights?: Record<number, number>
 ): Question[] {
   const bySubject = new Map<number, Question[]>();
   for (const q of questions) {
@@ -28,13 +29,34 @@ export function pickStratifiedRandomQuestions(
   const subjects = [...bySubject.keys()].sort((a, b) => a - b);
   if (subjects.length === 0) return [];
 
-  const base = Math.floor(count / subjects.length);
-  let remainder = count - base * subjects.length;
-
+  // weights가 있으면(예: SQLD 1:4) 비례배분하고, 없으면 기존처럼 과목수로 균등배분한다.
   const quota = new Map<number, number>();
-  for (const subject of subjects) {
-    quota.set(subject, base + (remainder > 0 ? 1 : 0));
-    if (remainder > 0) remainder--;
+  if (weights) {
+    const totalWeight = subjects.reduce((sum, s) => sum + (weights[s] ?? 0), 0);
+    if (totalWeight > 0) {
+      const raw = subjects.map((s) => ({ subject: s, exact: (count * (weights[s] ?? 0)) / totalWeight }));
+      let assigned = 0;
+      for (const { subject, exact } of raw) {
+        const base = Math.floor(exact);
+        quota.set(subject, base);
+        assigned += base;
+      }
+      let remainder = count - assigned;
+      const byFraction = [...raw].sort((a, b) => b.exact - Math.floor(b.exact) - (a.exact - Math.floor(a.exact)));
+      for (const { subject } of byFraction) {
+        if (remainder <= 0) break;
+        quota.set(subject, (quota.get(subject) ?? 0) + 1);
+        remainder--;
+      }
+    }
+  }
+  if (quota.size === 0) {
+    const base = Math.floor(count / subjects.length);
+    let remainder = count - base * subjects.length;
+    for (const subject of subjects) {
+      quota.set(subject, base + (remainder > 0 ? 1 : 0));
+      if (remainder > 0) remainder--;
+    }
   }
 
   // 과목 풀이 배분량보다 작으면 있는 만큼만 쓰고, 모자란 만큼은 아직 여유

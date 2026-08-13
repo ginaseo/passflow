@@ -14,7 +14,7 @@ export type PracticeSetupValue =
       mode: Mode;
       entryType: "random";
       subject: number | "all";
-      count: 20 | 40 | 100;
+      count: number;
       timeLimitMs: number | null;
     }
   | { mode: Mode; entryType: "round"; examId: string; timeLimitMs: number | null };
@@ -26,7 +26,7 @@ interface PracticeSetupProps {
   initialEntryType?: "random" | "round";
   initialMode?: Mode;
   initialSubject?: number | "all";
-  initialCount?: 20 | 40 | 100;
+  initialCount?: number;
 }
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -35,6 +35,13 @@ const STATUS_STYLE: Record<ExamStatus, string> = {
   미응시: "text-gray-400",
   진행중: "text-blue-600",
   완료: "text-green-600",
+};
+
+// 자격증별 실제 시험 문항수를 기준으로 한 랜덤모드 문항수 선택지 — 정처기는
+// 100문항 시험의 20%/40%/100%, SQLD는 50문항 시험의 20%/40%/100%에 대응한다.
+const COUNT_OPTIONS: Record<string, number[]> = {
+  jcg: [20, 40, 100],
+  sqld: [10, 25, 50],
 };
 
 export function PracticeSetup({
@@ -47,9 +54,11 @@ export function PracticeSetup({
   initialCount,
 }: PracticeSetupProps) {
   const [mode, setMode] = useState<Mode>(initialMode ?? "study");
+  const [timeLimitMode, setTimeLimitMode] = useState<"auto" | "none">("none");
   const [entryType, setEntryType] = useState<"random" | "round">(initialEntryType ?? "random");
   const [subject, setSubject] = useState<number | "all">(initialSubject ?? "all");
-  const [count, setCount] = useState<20 | 40 | 100>(initialCount ?? 20);
+  const countOptions = COUNT_OPTIONS[certId] ?? COUNT_OPTIONS.jcg;
+  const [count, setCount] = useState<number>(initialCount ?? countOptions[1]);
   const [examId, setExamId] = useState<string | null>(null);
   const [exams, setExams] = useState<ExamSummary[] | null>(null);
   const [statuses, setStatuses] = useState<Map<string, ExamStatus>>(new Map());
@@ -84,25 +93,27 @@ export function PracticeSetup({
     );
   }, [questionRepository]);
 
-  // 제한시간은 사용자가 고르지 않는다 — 자격증별 실제 시험의 문항당 배정 시간
-  // 비율로 항상 자동 계산한다(회차별은 그 회차의 실제 문항수 기준).
+  // 제한시간 값 자체는 사용자가 고르지 않는다 — 자격증별 실제 시험의 문항당 배정
+  // 시간 비율로 항상 자동 계산한다(회차별은 그 회차의 실제 문항수 기준). 다만
+  // 시험모드에서 그 자동값을 적용할지, 아예 제한없음으로 풀지는 고를 수 있다.
   const roundQuestionCount = examId ? (exams?.find((e) => e.examId === examId)?.count ?? 0) : 0;
   const autoTimeLimitMs =
     mode === "exam"
       ? computeExamTimeLimitMs(certId, entryType === "round" ? roundQuestionCount : count)
       : null;
+  const timeLimitMs = timeLimitMode === "auto" ? autoTimeLimitMs : null;
 
   function handleStart() {
     if (entryType === "round") {
       if (!examId) return;
-      onStart({ mode, entryType: "round", examId, timeLimitMs: autoTimeLimitMs });
+      onStart({ mode, entryType: "round", examId, timeLimitMs });
     } else {
       onStart({
         mode,
         entryType: "random",
         subject,
         count,
-        timeLimitMs: autoTimeLimitMs,
+        timeLimitMs,
       });
     }
   }
@@ -136,13 +147,26 @@ export function PracticeSetup({
       {mode === "exam" && (
         <div className="flex flex-col gap-2">
           <span className="font-medium">제한시간</span>
-          <p className="text-sm text-gray-600">
-            {autoTimeLimitMs
-              ? `${Math.round(autoTimeLimitMs / 60000)}분 (문항수에 따라 자동 설정)`
-              : entryType === "round" && !examId
-                ? "회차를 선택하면 자동으로 정해진다."
-                : "제한없음"}
-          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setTimeLimitMode("none")}
+              className={`px-3 py-1.5 rounded border ${timeLimitMode === "none" ? "bg-black text-white" : ""}`}
+            >
+              제한없음
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimeLimitMode("auto")}
+              className={`px-3 py-1.5 rounded border ${timeLimitMode === "auto" ? "bg-black text-white" : ""}`}
+            >
+              {autoTimeLimitMs
+                ? `${Math.round(autoTimeLimitMs / 60000)}분`
+                : entryType === "round" && !examId
+                  ? "자동"
+                  : "-"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -194,7 +218,7 @@ export function PracticeSetup({
           <div className="flex flex-col gap-2">
             <span className="font-medium">문항수</span>
             <div className="flex gap-2">
-              {([20, 40, 100] as const).map((n) => (
+              {countOptions.map((n) => (
                 <button
                   key={n}
                   type="button"
