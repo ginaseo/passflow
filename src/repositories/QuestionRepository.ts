@@ -43,7 +43,7 @@ export class JsonQuestionRepository implements QuestionRepository {
         .then((raw) =>
           raw.questions.map(
             (q): Question => ({
-              questionId: makeQuestionId(raw.examId, q.qnum),
+              questionId: makeQuestionId(this.certId, raw.examId, q.qnum),
               examId: raw.examId,
               qnum: q.qnum,
               stem: q.stem,
