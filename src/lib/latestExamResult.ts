@@ -68,3 +68,26 @@ export function scoreExamSession(
 
   return { correct, total, solved, passed, subjectScores };
 }
+
+export function getExamSessionWrongQuestionIds(
+  questions: Question[],
+  attempts: Attempt[],
+  examId: string,
+  sessionId: string
+): string[] {
+  const byQnum = new Map<number, Attempt>();
+  for (const a of attempts) {
+    if (a.mode !== "exam" || a.sessionId !== sessionId) continue;
+    const { examId: attemptExamId, qnum } = parseQuestionId(a.questionId);
+    if (attemptExamId !== examId) continue;
+    const prev = byQnum.get(qnum);
+    if (!prev || a.solvedAt > prev.solvedAt) byQnum.set(qnum, a);
+  }
+
+  return questions
+    .filter((q) => {
+      const attempt = byQnum.get(q.qnum);
+      return !attempt || !attempt.isCorrect;
+    })
+    .map((q) => q.questionId);
+}

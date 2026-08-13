@@ -45,7 +45,7 @@ function CbtCard({ result: r }: { result: CbtResult }) {
   // 이동하는 오답노트 화면의 실제 문항수와 일치시키려면 여기서도 같은 기준이어야
   // 한다. total - correct로 계산하면 안 푼 문항까지 오답으로 잡혀 오답노트 개수와
   // 어긋나고, 미완료 회차를 이어서 풀수록(#47) 숫자가 계속 바뀌어 보인다.
-  const wrongCount = r.solved - r.correct;
+  const wrongCount = r.total - r.correct;
   return (
     <div className="p-4 rounded border flex flex-col gap-2">
       <div className="flex justify-between items-baseline">
@@ -70,7 +70,7 @@ function CbtCard({ result: r }: { result: CbtResult }) {
       </ul>
       {wrongCount > 0 && (
         <Link
-          href={`/review?examId=${encodeURIComponent(r.examId)}&mode=exam`}
+          href={`/review?examId=${encodeURIComponent(r.examId)}&sessionId=${encodeURIComponent(r.sessionId)}&mode=exam`}
           className="self-start text-sm text-blue-700 underline"
         >
           오답 다시풀기 ({wrongCount}문제)

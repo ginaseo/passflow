@@ -7,6 +7,7 @@ import { PracticeSession } from "@/features/practice/PracticeSession";
 import { getAllSolvedQuestionIds } from "@/lib/recentlySolved";
 import { pickRandomQuestions } from "@/lib/sampling";
 import { tryParseQuestionId } from "@/lib/questionId";
+import { getExamSessionWrongQuestionIds, listExamSessions } from "@/lib/latestExamResult";
 import { getSubjectLabel } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
@@ -52,7 +53,10 @@ async function hydrate(questionRepository: QuestionRepository, questionIds: stri
 
 async function fetchTabQuestions(
   questionRepository: QuestionRepository,
-  nextTab: Tab
+  nextTab: Tab,
+  modeFilter: "all" | "study" | "exam",
+  roundFilter: string,
+  sessionIdFilter: string | null
 ): Promise<{ questions: Question[]; wrongNotesById: Map<string, WrongNote>; modeById: Map<string, Mode> }> {
   let questionIds: string[];
   let wrongNotesById = new Map<string, WrongNote>();
@@ -64,6 +68,43 @@ async function fetchTabQuestions(
   const modeById = new Map<string, Mode>();
   for (const a of [...attempts].sort((x, y) => x.solvedAt - y.solvedAt)) {
     modeById.set(a.questionId, a.mode);
+  }
+
+  if (nextTab === "wrong" && modeFilter === "exam") {
+    const sessions = listExamSessions(attempts);
+    const targetExamIds =
+      roundFilter === "all" ? [...new Set(sessions.map((session) => session.examId))] : [roundFilter];
+    const questionIds = new Set<string>();
+    const wrongNotesById = new Map<string, WrongNote>();
+
+    for (const examId of targetExamIds) {
+      const session =
+        (sessionIdFilter && roundFilter !== "all"
+          ? sessions.find((item) => item.examId === examId && item.sessionId === sessionIdFilter)
+          : null) ?? sessions.find((item) => item.examId === examId);
+      if (!session) continue;
+
+      const examQuestions = await questionRepository.getQuestions({ examId });
+      const wrongIds = getExamSessionWrongQuestionIds(examQuestions, attempts, examId, session.sessionId);
+      for (const questionId of wrongIds) {
+        questionIds.add(questionId);
+        wrongNotesById.set(questionId, {
+          questionId,
+          addedAt: session.solvedAt,
+          mode: "exam",
+        });
+        modeById.set(questionId, "exam");
+      }
+    }
+
+    const questions = await hydrate(questionRepository, [...questionIds]);
+    questions.sort((a, b) => {
+      const examA = tryParseQuestionId(a.questionId)?.examId ?? "";
+      const examB = tryParseQuestionId(b.questionId)?.examId ?? "";
+      return examB.localeCompare(examA) || a.qnum - b.qnum;
+    });
+
+    return { questions, wrongNotesById, modeById };
   }
 
   if (nextTab === "wrong") {
@@ -89,20 +130,21 @@ function ReviewContent() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [wrongNotesById, setWrongNotesById] = useState<Map<string, WrongNote>>(new Map());
   const [modeById, setModeById] = useState<Map<string, Mode>>(new Map());
-  // `loadedTab` (rather than a `loading` boolean flipped via effect) lets `loading` be
-  // derived during render instead of set synchronously inside useEffect, which
-  // react-hooks/set-state-in-effect disallows even through an intermediate async call.
-  const [loadedTab, setLoadedTab] = useState<Tab | null>(null);
-  const latestRequestId = useRef(0);
-  const loading = loadedTab !== tab;
-
   const searchParams = useSearchParams();
   const [modeFilter, setModeFilter] = useState<"all" | "study" | "exam">(() => {
     const m = searchParams.get("mode");
     return m === "study" || m === "exam" ? m : "all";
   });
   const [roundFilter, setRoundFilter] = useState<string>(() => searchParams.get("examId") ?? "all");
+  const sessionIdFilter = searchParams.get("sessionId");
   const [subjectFilter, setSubjectFilter] = useState<string>(() => searchParams.get("subject") ?? "all");
+  const requestKey = `${tab}|${modeFilter}|${roundFilter}|${sessionIdFilter ?? ""}`;
+  // `loadedTab` (rather than a `loading` boolean flipped via effect) lets `loading` be
+  // derived during render instead of set synchronously inside useEffect, which
+  // react-hooks/set-state-in-effect disallows even through an intermediate async call.
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const latestRequestId = useRef(0);
+  const loading = loadedKey !== requestKey;
 
   const availableRounds =
     tab === "wrong"
@@ -144,13 +186,13 @@ function ReviewContent() {
   // captures a function which itself calls a state setter, however deep.
   function loadTab(nextTab: Tab) {
     const requestId = ++latestRequestId.current;
-    fetchTabQuestions(questionRepository, nextTab).then(
+    fetchTabQuestions(questionRepository, nextTab, modeFilter, roundFilter, sessionIdFilter).then(
       ({ questions: hydrated, wrongNotesById: notes, modeById: modes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
         setWrongNotesById(notes);
         setModeById(modes);
-        setLoadedTab(nextTab);
+        setLoadedKey(`${nextTab}|${modeFilter}|${roundFilter}|${sessionIdFilter ?? ""}`);
       },
       (err) => {
         if (requestId !== latestRequestId.current) return;
@@ -158,20 +200,20 @@ function ReviewContent() {
         setQuestions([]);
         setWrongNotesById(new Map());
         setModeById(new Map());
-        setLoadedTab(nextTab);
+        setLoadedKey(`${nextTab}|${modeFilter}|${roundFilter}|${sessionIdFilter ?? ""}`);
       }
     );
   }
 
   useEffect(() => {
     const requestId = ++latestRequestId.current;
-    fetchTabQuestions(questionRepository, tab).then(
+    fetchTabQuestions(questionRepository, tab, modeFilter, roundFilter, sessionIdFilter).then(
       ({ questions: hydrated, wrongNotesById: notes, modeById: modes }) => {
         if (requestId !== latestRequestId.current) return;
         setQuestions(hydrated);
         setWrongNotesById(notes);
         setModeById(modes);
-        setLoadedTab(tab);
+        setLoadedKey(requestKey);
       },
       (err) => {
         if (requestId !== latestRequestId.current) return;
@@ -179,10 +221,10 @@ function ReviewContent() {
         setQuestions([]);
         setWrongNotesById(new Map());
         setModeById(new Map());
-        setLoadedTab(tab);
+        setLoadedKey(requestKey);
       }
     );
-  }, [tab, questionRepository]);
+  }, [tab, questionRepository, modeFilter, roundFilter, sessionIdFilter, requestKey]);
 
   async function handleRemove(questionId: string) {
     const removingFromTab = tab;
