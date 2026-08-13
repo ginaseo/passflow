@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { computeExamStatuses, type ExamStatus } from "@/lib/examStatus";
 import { getSubjectLabel } from "@/lib/theory";
-import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import type { QuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
-import { getSelectedCertId } from "@/lib/cert";
 import type { Mode } from "@/types/progress";
 import type { ExamSummary } from "@/types/question";
 
@@ -20,6 +19,7 @@ export type PracticeSetupValue =
   | { mode: Mode; entryType: "round"; examId: string; timeLimitMs: number | null };
 
 interface PracticeSetupProps {
+  questionRepository: QuestionRepository;
   onStart: (value: PracticeSetupValue) => void;
   initialEntryType?: "random" | "round";
   initialMode?: Mode;
@@ -44,6 +44,7 @@ const STATUS_STYLE: Record<ExamStatus, string> = {
 };
 
 export function PracticeSetup({
+  questionRepository,
   onStart,
   initialEntryType,
   initialMode,
@@ -51,7 +52,6 @@ export function PracticeSetup({
   initialCount,
   initialTimeLimitMs,
 }: PracticeSetupProps) {
-  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
   const [mode, setMode] = useState<Mode>(initialMode ?? "study");
   const [entryType, setEntryType] = useState<"random" | "round">(initialEntryType ?? "random");
   const [subject, setSubject] = useState<number | "all">(initialSubject ?? "all");
@@ -79,11 +79,13 @@ export function PracticeSetup({
     // 회차가 많을수록 오래 걸릴 수 있다). 여기서 채운 캐시는 "시작" 시 재사용된다.
     questionRepository.getQuestions({}).then(
       (allQuestions) => {
-        setSubjects(
-          [...new Map(allQuestions.map((q) => [q.subject, q.subjectName] as const)).entries()]
-            .map(([subject, subjectName]) => ({ subject, subjectName }))
-            .sort((a, b) => a.subject - b.subject)
-        );
+        const subjectList = [...new Map(allQuestions.map((q) => [q.subject, q.subjectName] as const)).entries()]
+          .map(([subject, subjectName]) => ({ subject, subjectName }))
+          .sort((a, b) => a.subject - b.subject);
+        setSubjects(subjectList);
+        // URL(예: 오래된 북마크)로 들어온 초기 과목값이 이 자격증엔 없는 과목번호일
+        // 수 있다 — 그 경우 빈 문항 목록으로 조용히 실패하는 대신 "통합"으로 되돌린다.
+        setSubject((prev) => (prev === "all" || subjectList.some((s) => s.subject === prev) ? prev : "all"));
       },
       (err) => console.error("과목 목록을 불러오지 못했다:", err)
     );

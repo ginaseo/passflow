@@ -239,6 +239,7 @@ function PracticeContent() {
   if (phase.kind === "setup") {
     return (
       <PracticeSetup
+        questionRepository={questionRepository}
         onStart={start}
         initialEntryType={initialEntryType}
         initialMode={initialMode}

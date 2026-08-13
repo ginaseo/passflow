@@ -104,17 +104,6 @@ function ReviewContent() {
   const [roundFilter, setRoundFilter] = useState<string>(() => searchParams.get("examId") ?? "all");
   const [subjectFilter, setSubjectFilter] = useState<string>(() => searchParams.get("subject") ?? "all");
 
-  const filteredQuestions =
-    tab === "wrong"
-      ? questions.filter((q) => {
-          const note = wrongNotesById.get(q.questionId);
-          if (modeFilter !== "all" && note?.mode !== modeFilter) return false;
-          if (roundFilter !== "all" && tryParseQuestionId(q.questionId)?.examId !== roundFilter) return false;
-          if (subjectFilter !== "all" && String(q.subject) !== subjectFilter) return false;
-          return true;
-        })
-      : questions;
-
   const availableRounds =
     tab === "wrong"
       ? [
@@ -132,6 +121,23 @@ function ReviewContent() {
           .map(([subject, subjectName]) => ({ subject, subjectName }))
           .sort((a, b) => a.subject - b.subject)
       : [];
+
+  // URL(오래된 북마크 등)로 들어온 과목값이 이 자격증엔 없는 과목번호일 수 있다 —
+  // 그 경우 빈 목록으로 조용히 실패하는 대신 "전체 과목"으로 취급한다.
+  const effectiveSubjectFilter = availableSubjects.some((s) => String(s.subject) === subjectFilter)
+    ? subjectFilter
+    : "all";
+
+  const filteredQuestions =
+    tab === "wrong"
+      ? questions.filter((q) => {
+          const note = wrongNotesById.get(q.questionId);
+          if (modeFilter !== "all" && note?.mode !== modeFilter) return false;
+          if (roundFilter !== "all" && tryParseQuestionId(q.questionId)?.examId !== roundFilter) return false;
+          if (effectiveSubjectFilter !== "all" && String(q.subject) !== effectiveSubjectFilter) return false;
+          return true;
+        })
+      : questions;
 
   // Reusable for imperative reloads (e.g. the "복습 목록으로" button) — never referenced
   // from the effect below, since react-hooks/set-state-in-effect flags any effect that
@@ -312,7 +318,7 @@ function ReviewContent() {
             ))}
           </select>
           <select
-            value={subjectFilter}
+            value={effectiveSubjectFilter}
             onChange={(e) => setSubjectFilter(e.target.value)}
             className="px-2 py-1.5 rounded border text-sm"
           >
