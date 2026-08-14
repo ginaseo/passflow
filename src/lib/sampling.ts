@@ -13,6 +13,14 @@ export function pickRandomQuestions(
   return pool.slice(0, Math.min(count, pool.length));
 }
 
+// 랜덤 진입에서 "순차" 순서를 고른 경우 사용 — 셔플하지 않고 examId, qnum
+// 순으로 정렬해 앞에서부터 count개를 취한다. 여러 회차가 섞인 풀에서도 한
+// 회차씩 순서대로 지나가도록 examId를 먼저 기준으로 둔다.
+export function pickSequentialQuestions(questions: Question[], count: number): Question[] {
+  const sorted = [...questions].sort((a, b) => a.examId.localeCompare(b.examId) || a.qnum - b.qnum);
+  return sorted.slice(0, Math.min(count, sorted.length));
+}
+
 export function pickStratifiedRandomQuestions(
   questions: Question[],
   count: number,

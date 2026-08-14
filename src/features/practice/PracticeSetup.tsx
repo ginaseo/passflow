@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { computeExamStatuses, type ExamStatus } from "@/lib/examStatus";
 import { getSubjectLabel } from "@/lib/theory";
 import { computeExamTimeLimitMs } from "@/lib/examTimeLimit";
@@ -14,7 +14,11 @@ export type PracticeSetupValue =
       mode: Mode;
       entryType: "random";
       subject: number | "all";
+      // 지정되면 subject 대신 이 회차들(SQLD 노랭이 N-N과목처럼 과목번호가
+      // 뭉뚱그려진 자격증)로 풀을 제한한다.
+      examIds?: string[];
       count: number;
+      order: "random" | "sequential";
       timeLimitMs: number | null;
     }
   | { mode: Mode; entryType: "round"; examId: string; timeLimitMs: number | null };
@@ -40,9 +44,14 @@ const STATUS_STYLE: Record<ExamStatus, string> = {
 // 자격증별 실제 시험 문항수를 기준으로 한 랜덤모드 문항수 선택지 — 정처기는
 // 100문항 시험의 20%/40%/100%, SQLD는 50문항 시험의 20%/40%/100%에 대응한다.
 const COUNT_OPTIONS: Record<string, number[]> = {
-  jcg: [20, 40, 100],
-  sqld: [10, 25, 50],
+  jcg: [20, 40, 100, Infinity],
+  sqld: [10, 25, 50, Infinity],
 };
+
+// SQLD의 "노랭이 N-N과목" 원본 문제집 — 과목번호가 1/2로만 뭉뚱그려져 있어
+// 과목별 진입의 "과목" 선택지는 이 회차 단위로 대신 보여준다. 회차별
+// 목록에는 반대로 이걸 숨기고 실전모의고사만 남긴다.
+const SQLD_TOPIC_SET_PATTERN = /^SQLD-\d-\d$/;
 
 export function PracticeSetup({
   questionRepository,
@@ -54,21 +63,27 @@ export function PracticeSetup({
   initialCount,
 }: PracticeSetupProps) {
   const [mode, setMode] = useState<Mode>(initialMode ?? "study");
-  const [timeLimitMode, setTimeLimitMode] = useState<"auto" | "none">("none");
+  const [timeLimitMode, setTimeLimitMode] = useState<"auto" | "none">(initialMode === "exam" ? "auto" : "none");
   const [entryType, setEntryType] = useState<"random" | "round">(initialEntryType ?? "random");
   const [subject, setSubject] = useState<number | "all">(initialSubject ?? "all");
+  const [topicExamId, setTopicExamId] = useState<string | "all">("all");
+  const [order, setOrder] = useState<"random" | "sequential">("sequential");
   const countOptions = COUNT_OPTIONS[certId] ?? COUNT_OPTIONS.jcg;
-  const [count, setCount] = useState<number>(initialCount ?? countOptions[1]);
+  const [count, setCount] = useState<number>(initialCount ?? Infinity);
   const [examId, setExamId] = useState<string | null>(null);
   const [exams, setExams] = useState<ExamSummary[] | null>(null);
   const [statuses, setStatuses] = useState<Map<string, ExamStatus>>(new Map());
   const [subjects, setSubjects] = useState<{ subject: number; subjectName?: string }[]>([]);
+  const [subjectCounts, setSubjectCounts] = useState<Map<number | "all", number>>(new Map());
+  const selectedExamRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()]).then(
       ([examList, attempts]) => {
         setExams(examList);
         setStatuses(computeExamStatuses(examList, attempts));
+        // 회차별 기본값 — 있으면 최신 회차(2026년 2회)를 미리 골라둔다.
+        setExamId((prev) => prev ?? examList.find((e) => e.examId === "2026-2")?.examId ?? prev);
       },
       (err) => {
         console.error("회차 목록을 불러오지 못했다:", err);
@@ -88,18 +103,45 @@ export function PracticeSetup({
         // URL(예: 오래된 북마크)로 들어온 초기 과목값이 이 자격증엔 없는 과목번호일
         // 수 있다 — 그 경우 빈 문항 목록으로 조용히 실패하는 대신 "통합"으로 되돌린다.
         setSubject((prev) => (prev === "all" || subjectList.some((s) => s.subject === prev) ? prev : "all"));
+
+        // 문항수 "전체" 선택 시 제한시간 자동계산에 실제 문항수를 쓰기 위해 세어둔다.
+        const counts = new Map<number | "all", number>([["all", allQuestions.length]]);
+        for (const q of allQuestions) counts.set(q.subject, (counts.get(q.subject) ?? 0) + 1);
+        setSubjectCounts(counts);
       },
       (err) => console.error("과목 목록을 불러오지 못했다:", err)
     );
   }, [questionRepository]);
 
+  // 회차별 기본값(2026년 2회)이 목록 맨 아래쪽에 있어 스크롤해야 보인다 —
+  // 목록이 뜨면 선택된 회차가 바로 보이게 스크롤해준다.
+  useEffect(() => {
+    selectedExamRef.current?.scrollIntoView({ block: "nearest" });
+  }, [exams]);
+
+  // SQLD는 과목번호가 1/2로만 뭉뚱그려져 있어 "과목" 선택지를 노랭이 N-N과목
+  // 회차 단위로 대신 보여준다(과목번호 기반 selector는 정처기 전용으로 둔다).
+  const sqldTopicExams = certId === "sqld" ? (exams?.filter((e) => SQLD_TOPIC_SET_PATTERN.test(e.examId)) ?? []) : [];
+  const usesTopicExams = certId === "sqld";
+
   // 제한시간 값 자체는 사용자가 고르지 않는다 — 자격증별 실제 시험의 문항당 배정
   // 시간 비율로 항상 자동 계산한다(회차별은 그 회차의 실제 문항수 기준). 다만
   // 시험모드에서 그 자동값을 적용할지, 아예 제한없음으로 풀지는 고를 수 있다.
   const roundQuestionCount = examId ? (exams?.find((e) => e.examId === examId)?.count ?? 0) : 0;
+  // "전체"(Infinity)를 고르면 실제로 뽑히는 문항수(과목/회차 필터 반영)로 계산한다.
+  const topicQuestionCount =
+    topicExamId === "all"
+      ? sqldTopicExams.reduce((sum, e) => sum + e.count, 0)
+      : (exams?.find((e) => e.examId === topicExamId)?.count ?? 0);
+  const randomQuestionCount =
+    count === Infinity
+      ? usesTopicExams
+        ? topicQuestionCount
+        : (subjectCounts.get(subject) ?? 0)
+      : count;
   const autoTimeLimitMs =
     mode === "exam"
-      ? computeExamTimeLimitMs(certId, entryType === "round" ? roundQuestionCount : count)
+      ? computeExamTimeLimitMs(certId, entryType === "round" ? roundQuestionCount : randomQuestionCount)
       : null;
   const timeLimitMs = timeLimitMode === "auto" ? autoTimeLimitMs : null;
 
@@ -107,12 +149,24 @@ export function PracticeSetup({
     if (entryType === "round") {
       if (!examId) return;
       onStart({ mode, entryType: "round", examId, timeLimitMs });
+    } else if (usesTopicExams) {
+      const examIds = topicExamId === "all" ? sqldTopicExams.map((e) => e.examId) : [topicExamId];
+      onStart({
+        mode,
+        entryType: "random",
+        subject: "all",
+        examIds,
+        count,
+        order,
+        timeLimitMs,
+      });
     } else {
       onStart({
         mode,
         entryType: "random",
         subject,
         count,
+        order,
         timeLimitMs,
       });
     }
@@ -171,14 +225,34 @@ export function PracticeSetup({
       )}
 
       <div className="flex flex-col gap-2">
-        <span className="font-medium">진입 방식</span>
+        <span className="font-medium">순서</span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setOrder("sequential")}
+            className={`px-3 py-1.5 rounded border ${order === "sequential" ? "bg-black text-white" : ""}`}
+          >
+            순차
+          </button>
+          <button
+            type="button"
+            onClick={() => setOrder("random")}
+            className={`px-3 py-1.5 rounded border ${order === "random" ? "bg-black text-white" : ""}`}
+          >
+            랜덤
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="font-medium">범위</span>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setEntryType("random")}
             className={`px-3 py-1.5 rounded border ${entryType === "random" ? "bg-black text-white" : ""}`}
           >
-            랜덤
+            과목별
           </button>
           <button
             type="button"
@@ -193,25 +267,48 @@ export function PracticeSetup({
       {entryType === "random" ? (
         <>
           <div className="flex flex-col gap-2">
-            <span className="font-medium">과목</span>
             <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => setSubject("all")}
-                className={`px-3 py-1.5 rounded border ${subject === "all" ? "bg-black text-white" : ""}`}
-              >
-                통합
-              </button>
-              {subjects.map(({ subject: num, subjectName }) => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => setSubject(num)}
-                  className={`px-3 py-1.5 rounded border ${subject === num ? "bg-black text-white" : ""}`}
-                >
-                  {getSubjectLabel({ subject: num, subjectName })}
-                </button>
-              ))}
+              {usesTopicExams ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setTopicExamId("all")}
+                    className={`px-3 py-1.5 rounded border ${topicExamId === "all" ? "bg-black text-white" : ""}`}
+                  >
+                    통합
+                  </button>
+                  {sqldTopicExams.map((exam) => (
+                    <button
+                      key={exam.examId}
+                      type="button"
+                      onClick={() => setTopicExamId(exam.examId)}
+                      className={`px-3 py-1.5 rounded border ${topicExamId === exam.examId ? "bg-black text-white" : ""}`}
+                    >
+                      {exam.title}
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSubject("all")}
+                    className={`px-3 py-1.5 rounded border ${subject === "all" ? "bg-black text-white" : ""}`}
+                  >
+                    통합
+                  </button>
+                  {subjects.map(({ subject: num, subjectName }) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setSubject(num)}
+                      className={`px-3 py-1.5 rounded border ${subject === num ? "bg-black text-white" : ""}`}
+                    >
+                      {getSubjectLabel({ subject: num, subjectName })}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           </div>
 
@@ -225,7 +322,7 @@ export function PracticeSetup({
                   onClick={() => setCount(n)}
                   className={`px-3 py-1.5 rounded border ${count === n ? "bg-black text-white" : ""}`}
                 >
-                  {n}
+                  {n === Infinity ? "전체" : n}
                 </button>
               ))}
             </div>
@@ -233,16 +330,20 @@ export function PracticeSetup({
         </>
       ) : (
         <div className="flex flex-col gap-2">
-          <span className="font-medium">회차 선택</span>
           {exams === null ? (
             <p className="text-sm text-gray-500">불러오는 중...</p>
           ) : (
             <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-              {exams.map((exam) => {
+              {(() => {
+                const visible = exams.filter((exam) => !SQLD_TOPIC_SET_PATTERN.test(exam.examId));
+                // 정처기는 목록이 오래된 순으로 와서 최신 회차가 먼저 보이도록 뒤집는다.
+                return certId === "jcg" ? [...visible].reverse() : visible;
+              })().map((exam) => {
                 const status = statuses.get(exam.examId) ?? "미응시";
                 return (
                   <button
                     key={exam.examId}
+                    ref={examId === exam.examId ? selectedExamRef : undefined}
                     type="button"
                     onClick={() => setExamId(exam.examId)}
                     className={`flex justify-between px-3 py-1.5 rounded border ${examId === exam.examId ? "bg-black text-white" : ""}`}
