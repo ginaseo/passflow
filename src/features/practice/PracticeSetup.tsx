@@ -48,28 +48,22 @@ const COUNT_OPTIONS: Record<string, number[]> = {
   sqld: [10, 25, 50, Infinity],
 };
 
-// SQLD의 "노랭이 N-N과목" 원본 문제집 — 과목번호가 1/2로만 뭉뚱그려져 있어
-// 과목별 진입의 "과목" 선택지는 이 회차 단위로 대신 보여준다.
-const SQLD_TOPIC_SET_PATTERN = /^SQLD-\d-\d$/;
-// SQLD 기출복원 회차(SQLD-48~SQLD-58처럼 숫자 하나로만 된 examId)
+// SQLD 기출복원 회차(SQLD-48~SQLD-58처럼 숫자 하나로만 된 examId). 이 패턴에
+// 안 걸리는 나머지(노랭이 N-N과목, 실전모의고사, 최빈출 주제 등)는 전부
+// 과목별 진입 쪽 선택지로 넘긴다 — 회차별에는 중복 노출하지 않는다.
 const SQLD_ROUND_PATTERN = /^SQLD-(\d+)$/;
 
 // 회차별 목록에 보여줄 순서 — 정처기는 파일 순서가 오래된 것부터라 최신이
-// 먼저 보이도록 뒤집는다. SQLD는 기출복원 회차를 최신(숫자 큰 순)이 맨
-// 위로 오도록 정렬하고, 노랭이(주제별 원본 문제집)는 맨 아래로 보낸다.
+// 먼저 보이도록 뒤집는다. SQLD는 기출복원 회차만 최신(숫자 큰 순)이 맨
+// 위로 오도록 정렬해서 보여준다.
 // 이 순서의 첫 항목을 회차별 기본 선택값으로도 쓴다.
 function getOrderedVisibleExams(examList: ExamSummary[], certId: string): ExamSummary[] {
   if (certId === "jcg") return [...examList].reverse();
   if (certId !== "sqld") return examList;
 
-  const rounds = examList
+  return examList
     .filter((exam) => SQLD_ROUND_PATTERN.test(exam.examId))
     .sort((a, b) => Number(b.examId.match(SQLD_ROUND_PATTERN)![1]) - Number(a.examId.match(SQLD_ROUND_PATTERN)![1]));
-  const topicSets = examList.filter((exam) => SQLD_TOPIC_SET_PATTERN.test(exam.examId));
-  const rest = examList.filter(
-    (exam) => !SQLD_ROUND_PATTERN.test(exam.examId) && !SQLD_TOPIC_SET_PATTERN.test(exam.examId)
-  );
-  return [...rounds, ...rest, ...topicSets];
 }
 
 export function PracticeSetup({
@@ -149,9 +143,11 @@ export function PracticeSetup({
     selectedExamRef.current?.scrollIntoView({ block: "nearest" });
   }, [exams, entryType]);
 
-  // SQLD는 과목번호가 1/2로만 뭉뚱그려져 있어 "과목" 선택지를 노랭이 N-N과목
-  // 회차 단위로 대신 보여준다(과목번호 기반 selector는 정처기 전용으로 둔다).
-  const sqldTopicExams = certId === "sqld" ? (exams?.filter((e) => SQLD_TOPIC_SET_PATTERN.test(e.examId)) ?? []) : [];
+  // SQLD는 과목번호가 1/2로만 뭉뚱그려져 있어 "과목" 선택지를 회차 단위
+  // exam(노랭이 N-N과목, 실전모의고사, 최빈출 주제 등 — 기출복원 회차 제외
+  // 전부)으로 대신 보여준다(과목번호 기반 selector는 정처기 전용으로 둔다).
+  const sqldTopicExams =
+    certId === "sqld" ? (exams?.filter((e) => !SQLD_ROUND_PATTERN.test(e.examId)) ?? []) : [];
   const usesTopicExams = certId === "sqld";
 
   // 제한시간 값 자체는 사용자가 고르지 않는다 — 자격증별 실제 시험의 문항당 배정
