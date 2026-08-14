@@ -20,6 +20,7 @@ interface RawQuestion {
   image: string | null;
   sinagong?: string;
   table?: string;
+  verified?: boolean;
 }
 
 interface RawExam {
@@ -55,6 +56,7 @@ export class JsonQuestionRepository implements QuestionRepository {
               image: q.image ? `${this.certId}/${q.image}` : null,
               sinagong: q.sinagong,
               table: q.table,
+              verified: q.verified,
             })
           )
         )
