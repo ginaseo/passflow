@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickRandomQuestions, pickStratifiedRandomQuestions } from "./sampling";
+import { pickRandomQuestions, pickSequentialQuestions, pickStratifiedRandomQuestions } from "./sampling";
 import type { Question } from "@/types/question";
 
 function makeQuestions(n: number): Question[] {
@@ -43,6 +43,46 @@ describe("pickRandomQuestions", () => {
     const second = pickRandomQuestions(pool, 5, rng);
 
     expect(first.map((q) => q.questionId)).toEqual(second.map((q) => q.questionId));
+  });
+});
+
+describe("pickSequentialQuestions", () => {
+  it("examId, qnum 순으로 정렬해서 반환한다", () => {
+    const pool: Question[] = [
+      { ...makeQuestions(1)[0], questionId: "b-Q2", examId: "b", qnum: 2 },
+      { ...makeQuestions(1)[0], questionId: "a-Q3", examId: "a", qnum: 3 },
+      { ...makeQuestions(1)[0], questionId: "a-Q1", examId: "a", qnum: 1 },
+      { ...makeQuestions(1)[0], questionId: "b-Q1", examId: "b", qnum: 1 },
+    ];
+    const picked = pickSequentialQuestions(pool, pool.length);
+    expect(picked.map((q) => q.questionId)).toEqual(["a-Q1", "a-Q3", "b-Q1", "b-Q2"]);
+  });
+
+  it("count만큼만 앞에서부터 자른다", () => {
+    const pool = makeQuestions(10);
+    const picked = pickSequentialQuestions(pool, 3);
+    expect(picked.map((q) => q.qnum)).toEqual([0, 1, 2]);
+  });
+
+  it("count가 풀 크기보다 크면(Infinity 포함) 풀 전체를 반환한다", () => {
+    const pool = makeQuestions(5);
+    expect(pickSequentialQuestions(pool, 10)).toHaveLength(5);
+    expect(pickSequentialQuestions(pool, Infinity)).toHaveLength(5);
+  });
+
+  it("count가 0이거나 풀이 비어있으면 빈 배열을 반환한다", () => {
+    expect(pickSequentialQuestions(makeQuestions(5), 0)).toEqual([]);
+    expect(pickSequentialQuestions([], 10)).toEqual([]);
+  });
+
+  it("원본 배열을 변형하지 않는다", () => {
+    const pool = [
+      { ...makeQuestions(1)[0], questionId: "x-Q2", examId: "x", qnum: 2 },
+      { ...makeQuestions(1)[0], questionId: "x-Q1", examId: "x", qnum: 1 },
+    ];
+    const before = pool.map((q) => q.questionId);
+    pickSequentialQuestions(pool, pool.length);
+    expect(pool.map((q) => q.questionId)).toEqual(before);
   });
 });
 

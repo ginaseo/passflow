@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/PracticeSetup";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { AnswerGrid } from "@/features/practice/AnswerGrid";
-import { pickRandomQuestions, pickStratifiedRandomQuestions } from "@/lib/sampling";
+import { pickRandomQuestions, pickSequentialQuestions, pickStratifiedRandomQuestions } from "@/lib/sampling";
 import { getSubjectWeights } from "@/lib/examSubjectWeights";
 import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
@@ -179,13 +179,15 @@ function PracticeContent() {
         const pool = await questionRepository.getQuestions({ examId: value.examId });
         questions = [...pool].sort((a, b) => a.qnum - b.qnum);
       } else {
-        const pool = await questionRepository.getQuestions(
-          value.subject === "all" ? {} : { subject: value.subject }
-        );
+        const pool = value.examIds
+          ? (await questionRepository.getQuestions({})).filter((q) => value.examIds!.includes(q.examId))
+          : await questionRepository.getQuestions(value.subject === "all" ? {} : { subject: value.subject });
         questions =
-          value.subject === "all"
-            ? pickStratifiedRandomQuestions(pool, value.count, Math.random, getSubjectWeights(certId))
-            : pickRandomQuestions(pool, value.count);
+          value.order === "sequential"
+            ? pickSequentialQuestions(pool, value.count)
+            : value.subject === "all"
+              ? pickStratifiedRandomQuestions(pool, value.count, Math.random, getSubjectWeights(certId))
+              : pickRandomQuestions(pool, value.count);
       }
 
       const theoryMap = await theoryMapPromise;
