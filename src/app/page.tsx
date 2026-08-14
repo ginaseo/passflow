@@ -75,7 +75,7 @@ export default function HomePage() {
           </Link>
         )}
         <Link
-          href="/practice?mode=study&entry=random&subject=all&count=100"
+          href="/practice?mode=study&entry=random&subject=all"
           className="px-4 py-2 rounded border font-medium text-center"
         >
           학습모드

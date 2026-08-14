@@ -53,6 +53,15 @@ const COUNT_OPTIONS: Record<string, number[]> = {
 // 목록에는 반대로 이걸 숨기고 실전모의고사만 남긴다.
 const SQLD_TOPIC_SET_PATTERN = /^SQLD-\d-\d$/;
 
+// 회차별 목록에서 실제로 보여줄(주제별 원본 문제집 제외) 순서 — 정처기는
+// 파일 순서가 오래된 것부터라 최신이 먼저 보이도록 뒤집는다. 이 순서의
+// 첫 항목을 회차별 기본 선택값으로도 쓴다(정처기는 최신 회차, SQLD는
+// 실전모의고사 1회).
+function getOrderedVisibleExams(examList: ExamSummary[], certId: string): ExamSummary[] {
+  const visible = examList.filter((exam) => !SQLD_TOPIC_SET_PATTERN.test(exam.examId));
+  return certId === "jcg" ? [...visible].reverse() : visible;
+}
+
 export function PracticeSetup({
   questionRepository,
   certId,
@@ -83,8 +92,9 @@ export function PracticeSetup({
       ([examList, attempts]) => {
         setExams(examList);
         setStatuses(computeExamStatuses(examList, attempts));
-        // 회차별 기본값 — 있으면 최신 회차(2026년 2회)를 미리 골라둔다.
-        setExamId((prev) => prev ?? examList.find((e) => e.examId === "2026-2")?.examId ?? prev);
+        // 회차별 기본값 — 목록 맨 위(정처기는 최신 회차, SQLD는 실전모의고사 1회)를 미리 골라둔다.
+        const ordered = getOrderedVisibleExams(examList, certId);
+        setExamId((prev) => prev ?? ordered[0]?.examId ?? prev);
       },
       (err) => {
         console.error("회차 목록을 불러오지 못했다:", err);
@@ -112,17 +122,22 @@ export function PracticeSetup({
         setQuestionsLoaded(true);
       },
       (err) => {
+        // questionsLoaded를 켜지 않는다 — 실패한 채로 켜면 subjectCounts가 빈
+        // 상태로 "로딩 끝남" 취급돼 제한시간 자동계산이 0으로 나와 시작하자마자
+        // 자동제출되는 문제로 이어진다(회차별이 examId를 계속 null로 둬 시작을
+        // 막는 것과 동일하게, 여기서도 계산할 수 있을 때까지 시작을 막아둔다).
         console.error("과목 목록을 불러오지 못했다:", err);
-        setQuestionsLoaded(true);
       }
     );
-  }, [questionRepository]);
+  }, [questionRepository, certId]);
 
-  // 회차별 기본값(2026년 2회)이 목록 맨 아래쪽에 있어 스크롤해야 보인다 —
-  // 목록이 뜨면 선택된 회차가 바로 보이게 스크롤해준다.
+  // 회차별 기본값이 목록 맨 아래쪽에 있을 수 있어 스크롤해야 보인다 — 기본
+  // 진입방식이 "과목별"이라 exams가 로드될 때는 회차 버튼이 아직 안 그려져
+  // 있을 수 있다. entryType을 의존성에 넣어서 나중에 "회차별"로 전환해도
+  // (그때 버튼이 그려지면) 다시 스크롤되게 한다.
   useEffect(() => {
     selectedExamRef.current?.scrollIntoView({ block: "nearest" });
-  }, [exams]);
+  }, [exams, entryType]);
 
   // SQLD는 과목번호가 1/2로만 뭉뚱그려져 있어 "과목" 선택지를 노랭이 N-N과목
   // 회차 단위로 대신 보여준다(과목번호 기반 selector는 정처기 전용으로 둔다).
@@ -199,7 +214,10 @@ export function PracticeSetup({
           </button>
           <button
             type="button"
-            onClick={() => setMode("exam")}
+            onClick={() => {
+              setMode("exam");
+              setTimeLimitMode("auto");
+            }}
             className={`px-3 py-1.5 rounded border ${mode === "exam" ? "bg-black text-white" : ""}`}
           >
             시험모드
@@ -343,11 +361,7 @@ export function PracticeSetup({
             <p className="text-sm text-gray-500">불러오는 중...</p>
           ) : (
             <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
-              {(() => {
-                const visible = exams.filter((exam) => !SQLD_TOPIC_SET_PATTERN.test(exam.examId));
-                // 정처기는 목록이 오래된 순으로 와서 최신 회차가 먼저 보이도록 뒤집는다.
-                return certId === "jcg" ? [...visible].reverse() : visible;
-              })().map((exam) => {
+              {getOrderedVisibleExams(exams, certId).map((exam) => {
                 const status = statuses.get(exam.examId) ?? "미응시";
                 return (
                   <button
@@ -355,7 +369,7 @@ export function PracticeSetup({
                     ref={examId === exam.examId ? selectedExamRef : undefined}
                     type="button"
                     onClick={() => setExamId(exam.examId)}
-                    className={`flex justify-between px-3 py-1.5 rounded border ${examId === exam.examId ? "bg-black text-white" : ""}`}
+                    className={`flex justify-between gap-2 px-3 py-1.5 rounded border ${examId === exam.examId ? "bg-black text-white" : ""}`}
                   >
                     <span>{exam.title}</span>
                     <span className={examId === exam.examId ? "" : STATUS_STYLE[status]}>
