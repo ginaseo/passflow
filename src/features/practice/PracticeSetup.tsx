@@ -75,6 +75,7 @@ export function PracticeSetup({
   const [statuses, setStatuses] = useState<Map<string, ExamStatus>>(new Map());
   const [subjects, setSubjects] = useState<{ subject: number; subjectName?: string }[]>([]);
   const [subjectCounts, setSubjectCounts] = useState<Map<number | "all", number>>(new Map());
+  const [questionsLoaded, setQuestionsLoaded] = useState(false);
   const selectedExamRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -108,8 +109,12 @@ export function PracticeSetup({
         const counts = new Map<number | "all", number>([["all", allQuestions.length]]);
         for (const q of allQuestions) counts.set(q.subject, (counts.get(q.subject) ?? 0) + 1);
         setSubjectCounts(counts);
+        setQuestionsLoaded(true);
       },
-      (err) => console.error("과목 목록을 불러오지 못했다:", err)
+      (err) => {
+        console.error("과목 목록을 불러오지 못했다:", err);
+        setQuestionsLoaded(true);
+      }
     );
   }, [questionRepository]);
 
@@ -172,7 +177,11 @@ export function PracticeSetup({
     }
   }
 
-  const startDisabled = entryType === "round" && !examId;
+  // 과목별 진입은 exams(SQLD 과목별 회차목록)·questionsLoaded(문항수/제한시간 계산용)가
+  // 아직 안 불러와진 상태로 시작하면 빈 풀 오류(SQLD)나 제한시간 0으로 즉시
+  // 자동제출(시험모드+자동)로 이어질 수 있어, 로딩 끝나기 전엔 시작을 막는다.
+  const dataLoading = exams === null || !questionsLoaded;
+  const startDisabled = (entryType === "round" && !examId) || (entryType === "random" && dataLoading);
 
   return (
     <div className="flex flex-col gap-6 max-w-md mx-auto p-6">
@@ -358,6 +367,10 @@ export function PracticeSetup({
             </div>
           )}
         </div>
+      )}
+
+      {entryType === "random" && dataLoading && (
+        <p className="text-sm text-gray-500">불러오는 중...</p>
       )}
 
       <button
