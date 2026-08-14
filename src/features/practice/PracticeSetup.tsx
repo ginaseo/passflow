@@ -49,17 +49,27 @@ const COUNT_OPTIONS: Record<string, number[]> = {
 };
 
 // SQLD의 "노랭이 N-N과목" 원본 문제집 — 과목번호가 1/2로만 뭉뚱그려져 있어
-// 과목별 진입의 "과목" 선택지는 이 회차 단위로 대신 보여준다. 회차별
-// 목록에는 반대로 이걸 숨기고 실전모의고사만 남긴다.
+// 과목별 진입의 "과목" 선택지는 이 회차 단위로 대신 보여준다.
 const SQLD_TOPIC_SET_PATTERN = /^SQLD-\d-\d$/;
+// SQLD 기출복원 회차(SQLD-48~SQLD-58처럼 숫자 하나로만 된 examId)
+const SQLD_ROUND_PATTERN = /^SQLD-(\d+)$/;
 
-// 회차별 목록에서 실제로 보여줄(주제별 원본 문제집 제외) 순서 — 정처기는
-// 파일 순서가 오래된 것부터라 최신이 먼저 보이도록 뒤집는다. 이 순서의
-// 첫 항목을 회차별 기본 선택값으로도 쓴다(정처기는 최신 회차, SQLD는
-// 실전모의고사 1회).
+// 회차별 목록에 보여줄 순서 — 정처기는 파일 순서가 오래된 것부터라 최신이
+// 먼저 보이도록 뒤집는다. SQLD는 기출복원 회차를 최신(숫자 큰 순)이 맨
+// 위로 오도록 정렬하고, 노랭이(주제별 원본 문제집)는 맨 아래로 보낸다.
+// 이 순서의 첫 항목을 회차별 기본 선택값으로도 쓴다.
 function getOrderedVisibleExams(examList: ExamSummary[], certId: string): ExamSummary[] {
-  const visible = examList.filter((exam) => !SQLD_TOPIC_SET_PATTERN.test(exam.examId));
-  return certId === "jcg" ? [...visible].reverse() : visible;
+  if (certId === "jcg") return [...examList].reverse();
+  if (certId !== "sqld") return examList;
+
+  const rounds = examList
+    .filter((exam) => SQLD_ROUND_PATTERN.test(exam.examId))
+    .sort((a, b) => Number(b.examId.match(SQLD_ROUND_PATTERN)![1]) - Number(a.examId.match(SQLD_ROUND_PATTERN)![1]));
+  const topicSets = examList.filter((exam) => SQLD_TOPIC_SET_PATTERN.test(exam.examId));
+  const rest = examList.filter(
+    (exam) => !SQLD_ROUND_PATTERN.test(exam.examId) && !SQLD_TOPIC_SET_PATTERN.test(exam.examId)
+  );
+  return [...rounds, ...rest, ...topicSets];
 }
 
 export function PracticeSetup({
