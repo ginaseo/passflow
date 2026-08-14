@@ -38,7 +38,7 @@ export function QuestionCard({
           {index + 1} / {total} · {getSubjectLabel(question)}
           {question.verified === false && (
             <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-xs align-middle">
-              재구성 문항 — 실제 기출과 다를 수 있음
+              재구성 문항 - 실제 기출과 다를 수 있음.
             </span>
           )}
         </span>
