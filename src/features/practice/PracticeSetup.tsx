@@ -58,7 +58,7 @@ const SQLD_ROUND_PATTERN = /^SQLD-(\d+)$/;
 // 먼저 보이도록 뒤집는다. SQLD는 기출복원 회차를 최신(숫자 큰 순)이 맨
 // 위로 오도록 정렬하고, 노랭이(주제별 원본 문제집)는 맨 아래로 보낸다.
 // 이 순서의 첫 항목을 회차별 기본 선택값으로도 쓴다.
-function getOrderedVisibleExams(examList: ExamSummary[], certId: string): ExamSummary[] {
+export function getOrderedVisibleExams(examList: ExamSummary[], certId: string): ExamSummary[] {
   if (certId === "jcg") return [...examList].reverse();
   if (certId !== "sqld") return examList;
 
