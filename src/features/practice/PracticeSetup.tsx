@@ -92,8 +92,14 @@ export function PracticeSetup({
   const selectedExamRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
+    // certId가 기본값에서 실제 선택값으로 바뀌면 questionRepository도 바뀌어 이 effect가
+    // 다시 실행된다 — 이전(옛 자격증) fetch가 취소되지 않으므로 늦게 끝나면 최신 상태를
+    // 덮어쓸 수 있다. 이 effect 인스턴스만의 토큰으로 최신 실행인지 확인하고 아니면 버린다.
+    let cancelled = false;
+
     Promise.all([questionRepository.getExamIndex(), progressRepository.getAttempts()]).then(
       ([examList, attempts]) => {
+        if (cancelled) return;
         setExams(examList);
         setStatuses(computeExamStatuses(examList, attempts));
         // 회차별 기본값 — 목록 맨 위(정처기는 최신 회차, SQLD는 실전모의고사 1회)를 미리 골라둔다.
@@ -101,6 +107,7 @@ export function PracticeSetup({
         setExamId((prev) => prev ?? ordered[0]?.examId ?? prev);
       },
       (err) => {
+        if (cancelled) return;
         console.error("회차 목록을 불러오지 못했다:", err);
         setExams([]);
       }
@@ -111,6 +118,7 @@ export function PracticeSetup({
     // 회차가 많을수록 오래 걸릴 수 있다). 여기서 채운 캐시는 "시작" 시 재사용된다.
     questionRepository.getQuestions({}).then(
       (allQuestions) => {
+        if (cancelled) return;
         const subjectList = [...new Map(allQuestions.map((q) => [q.subject, q.subjectName] as const)).entries()]
           .map(([subject, subjectName]) => ({ subject, subjectName }))
           .sort((a, b) => a.subject - b.subject);
@@ -126,6 +134,7 @@ export function PracticeSetup({
         setQuestionsLoaded(true);
       },
       (err) => {
+        if (cancelled) return;
         // questionsLoaded를 켜지 않는다 — 실패한 채로 켜면 subjectCounts가 빈
         // 상태로 "로딩 끝남" 취급돼 제한시간 자동계산이 0으로 나와 시작하자마자
         // 자동제출되는 문제로 이어진다(회차별이 examId를 계속 null로 둬 시작을
@@ -133,6 +142,10 @@ export function PracticeSetup({
         console.error("과목 목록을 불러오지 못했다:", err);
       }
     );
+
+    return () => {
+      cancelled = true;
+    };
   }, [questionRepository, certId]);
 
   // 회차별 기본값이 목록 맨 아래쪽에 있을 수 있어 스크롤해야 보인다 — 기본

@@ -14,7 +14,7 @@ import { getUnansweredQuestions, pickResumeSession } from "@/lib/resumeExam";
 import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
-import { getSelectedCertId } from "@/lib/cert";
+import { getSelectedCertId, DEFAULT_CERT_ID } from "@/lib/cert";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { EntryType, Mode } from "@/types/progress";
 import type { Question } from "@/types/question";
@@ -42,7 +42,19 @@ type Phase =
   | { kind: "error"; message: string };
 
 function PracticeContent() {
-  const certId = useMemo(() => getSelectedCertId(), []);
+  // getSelectedCertId()는 localStorage를 읽으므로 SSR에서는 항상 기본값을 반환한다.
+  // 클라이언트 첫 렌더에서 곧바로 실제 선택값을 읽으면 서버가 만든 HTML(기본값 기준)과
+  // 달라져 hydration mismatch가 나므로, 첫 렌더는 서버와 동일하게 기본값으로 시작하고
+  // 마운트 후 effect에서 실제 값으로 갱신한다.
+  const [certId, setCertId] = useState(DEFAULT_CERT_ID);
+  useEffect(() => {
+    // localStorage(마운트 시점에만 한 번 읽으면 되는 외부 상태)를 React state로
+    // 동기화하는 것이 이 effect의 유일한 목적이라 setState 직접 호출이 맞다 —
+    // 자격증 전환은 페이지 전체 리로드로 처리되므로(cert.ts) 마운트 중 값이 바뀔
+    // 일이 없어 useSyncExternalStore로 구독할 필요는 없다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCertId(getSelectedCertId());
+  }, []);
   const questionRepository = useMemo(() => new JsonQuestionRepository(certId), [certId]);
   const searchParams = useSearchParams();
   const resumeExamId = searchParams.get("resume");
