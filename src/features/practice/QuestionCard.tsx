@@ -75,15 +75,27 @@ export function QuestionCard({
           else if (showFeedback && isSelected && !isAnswer) style = "border-red-600 bg-red-50";
           else if (isSelected) style = "border-blue-600";
 
+          const hasTable = option.includes("<table");
+
           return (
             <button
               key={optionNumber}
               type="button"
               disabled={showFeedback}
               onClick={() => onSelect(optionNumber)}
-              className={`text-left px-3 py-2 rounded border whitespace-pre-wrap ${style}`}
+              className={`text-left px-3 py-2 rounded border ${hasTable ? "" : "whitespace-pre-wrap"} ${style}`}
             >
-              {optionNumber}. {option}
+              {hasTable ? (
+                <>
+                  <span>{optionNumber}.</span>
+                  <div
+                    className="mt-1 overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left"
+                    dangerouslySetInnerHTML={{ __html: option }}
+                  />
+                </>
+              ) : (
+                `${optionNumber}. ${option}`
+              )}
             </button>
           );
         })}
