@@ -148,6 +148,60 @@ describe("JsonQuestionRepository", () => {
     expect(fetch).toHaveBeenCalledWith("/data/jcg/theory_map.json");
   });
 
+  it("RawQuestion의 verified 값을 Question에 그대로 전달한다(false/true/미지정)", async () => {
+    const examWithVerified = {
+      examId: "2024-1",
+      title: "2024년 1회",
+      questions: [
+        {
+          qnum: 1,
+          stem: "재구성 문항",
+          options: ["a", "b", "c", "d"],
+          subject: 1,
+          answer: 1,
+          explanation: "",
+          image: null,
+          verified: false,
+        },
+        {
+          qnum: 2,
+          stem: "검증된 문항",
+          options: ["a", "b", "c", "d"],
+          subject: 1,
+          answer: 1,
+          explanation: "",
+          image: null,
+          verified: true,
+        },
+        {
+          qnum: 3,
+          stem: "verified 미지정 문항",
+          options: ["a", "b", "c", "d"],
+          subject: 1,
+          answer: 1,
+          explanation: "",
+          image: null,
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(examWithVerified),
+        } as Response)
+      )
+    );
+
+    const repo = new JsonQuestionRepository("jcg");
+    const qs = await repo.getQuestions({ examId: "2024-1" });
+
+    expect(qs.find((q) => q.qnum === 1)?.verified).toBe(false);
+    expect(qs.find((q) => q.qnum === 2)?.verified).toBe(true);
+    expect(qs.find((q) => q.qnum === 3)?.verified).toBeUndefined();
+  });
+
   it("getTheoryMap을 두 번 불러도 fetch는 한 번만 일어난다 (캐시)", async () => {
     const repo = new JsonQuestionRepository("jcg");
     await repo.getTheoryMap();
