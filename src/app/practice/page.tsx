@@ -48,6 +48,11 @@ function PracticeContent() {
   // 마운트 후 effect에서 실제 값으로 갱신한다.
   const [certId, setCertId] = useState(DEFAULT_CERT_ID);
   useEffect(() => {
+    // localStorage(마운트 시점에만 한 번 읽으면 되는 외부 상태)를 React state로
+    // 동기화하는 것이 이 effect의 유일한 목적이라 setState 직접 호출이 맞다 —
+    // 자격증 전환은 페이지 전체 리로드로 처리되므로(cert.ts) 마운트 중 값이 바뀔
+    // 일이 없어 useSyncExternalStore로 구독할 필요는 없다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCertId(getSelectedCertId());
   }, []);
   const questionRepository = useMemo(() => new JsonQuestionRepository(certId), [certId]);
