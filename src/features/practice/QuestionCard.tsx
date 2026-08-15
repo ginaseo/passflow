@@ -50,7 +50,11 @@ export function QuestionCard({
       <p className="text-lg font-medium whitespace-pre-wrap">{question.stem}</p>
 
       {question.image && (
-        <img src={`/data/${question.image}`} alt="문항 이미지" className="max-w-full rounded border" />
+        <img
+          src={`/data/${question.image}`}
+          alt="문항 이미지"
+          className="max-w-full max-h-[420px] w-auto object-contain rounded border mx-auto"
+        />
       )}
 
       {question.table && (
