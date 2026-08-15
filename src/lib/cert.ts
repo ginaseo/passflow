@@ -1,5 +1,5 @@
 const CERT_STORAGE_KEY = "pf_cert";
-const DEFAULT_CERT_ID = "jcg";
+export const DEFAULT_CERT_ID = "jcg";
 
 export interface CertInfo {
   id: string;
