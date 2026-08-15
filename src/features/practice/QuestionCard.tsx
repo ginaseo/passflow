@@ -81,7 +81,7 @@ export function QuestionCard({
               type="button"
               disabled={showFeedback}
               onClick={() => onSelect(optionNumber)}
-              className={`text-left px-3 py-2 rounded border ${style}`}
+              className={`text-left px-3 py-2 rounded border whitespace-pre-wrap ${style}`}
             >
               {optionNumber}. {option}
             </button>
