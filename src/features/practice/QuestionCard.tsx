@@ -35,7 +35,7 @@ export function QuestionCard({
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
       <div className="flex items-center justify-between text-sm text-gray-500">
         <span>
-          {index + 1} / {total} · {getSubjectLabel(question)}
+          {index + 1} / {total} · 원본 {question.qnum}번 · {getSubjectLabel(question)}
           {question.verified === false && (
             <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-xs align-middle">
               재구성 문항 - 실제 기출과 다를 수 있음.
