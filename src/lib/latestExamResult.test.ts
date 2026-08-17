@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getExamSessionWrongQuestionIds, listExamSessions, scoreExamSession } from "./latestExamResult";
+import { listExamSessions, scoreExamSession } from "./latestExamResult";
 import type { Attempt } from "@/types/progress";
 import type { Question } from "@/types/question";
 

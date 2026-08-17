@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { getSubjectLabel } from "@/lib/theory";
 import type { PublicQuestion } from "@/types/question";
 import type { TheoryLink } from "@/types/theory";
@@ -52,26 +53,31 @@ export function QuestionCard({
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
       <div className="flex items-center justify-between text-sm text-gray-500">
         <span>
-          {index + 1} / {total} · 원본 {question.qnum}번 · {getSubjectLabel(question)}
+          {index + 1} / {total} 쨌 ?먮낯 {question.qnum}踰?쨌 {getSubjectLabel(question)}
           {question.verified === false && (
             <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-xs align-middle">
-              재구성 문항 - 실제 기출과 다를 수 있음.
+              재구성 문항 - 실제 기출과 다를 수 있음
             </span>
           )}
         </span>
         <button type="button" onClick={onFavorite} className="text-yellow-600">
-          {isFavorited ? "★ 즐겨찾기 완료" : "☆ 즐겨찾기"}
+          {isFavorited ? "??利먭꺼李얘린 ?꾨즺" : "??利먭꺼李얘린"}
         </button>
       </div>
 
       <p className="text-lg font-medium whitespace-pre-wrap">{question.stem}</p>
 
       {question.image && (
-        <img
-          src={imageSrc(question.image)}
-          alt="문항 이미지"
-          className="max-w-full max-h-[420px] w-auto object-contain rounded border mx-auto"
-        />
+        <div className="relative mx-auto h-[320px] w-full max-w-full">
+          <Image
+            src={imageSrc(question.image)}
+            alt="문항 이미지"
+            fill
+            sizes="(max-width: 768px) 100vw, 640px"
+            className="rounded border object-contain"
+            unoptimized
+          />
+        </div>
       )}
 
       {question.table && (
@@ -121,12 +127,12 @@ export function QuestionCard({
       {showFeedback && feedback && (
         <div className="flex flex-col gap-2 mt-2 p-3 rounded bg-gray-50">
           <p className={isCorrect ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
-            {isCorrect ? "정답" : "오답"}
+            {isCorrect ? "?뺣떟" : "?ㅻ떟"}
           </p>
           <p className="text-sm whitespace-pre-wrap">{feedback.explanation}</p>
           {theoryLink && (
             <p className="text-sm text-blue-700">
-              관련 이론: {theoryLink.label} (p.{theoryLink.page})
+              愿???대줎: {theoryLink.label} (p.{theoryLink.page})
             </p>
           )}
         </div>
