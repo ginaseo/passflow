@@ -41,7 +41,31 @@ function imageSrc(image: string): string {
 function formatPlaceholderText(text: string): string {
   return text
   .replace(/(?<!\[)㉠(?!\])/g, "[㉠]")
-  .replace(/(?<!\[)㉡(?!\])/g, "[㉡]");
+  .replace(/(?<!\[)㉡(?!\])/g, "[㉡]")
+  .replace(/&#x3260;?/gi, "[㉠]")
+  .replace(/&#12896;/g, "[㉠]")
+  .replace(/&#x3261;?/gi, "[㉡]")
+  .replace(/&#12897;/g, "[㉡]");
+}
+
+function formatPlaceholderHtml(html: string): string {
+  let placeholderIndex = 0;
+  const placeholders = ["㉠", "㉡", "㉢", "㉣", "㉤"];
+
+  let result = formatPlaceholderText(html);
+
+  // 기출 데이터에서 빈칸으로 사용되는 빈 span을
+  // [㉠], [㉡] 형태로 변환
+  result = result.replace(
+      /<span\b[^>]*>\s*(?:&nbsp;|\u00a0)\s*<\/span>/gi,
+      () => {
+        const label = placeholders[placeholderIndex] ?? "㉠";
+        placeholderIndex += 1;
+        return `[${label}]`;
+      }
+  );
+
+  return result;
 }
 
 export function QuestionCard({
@@ -102,7 +126,7 @@ export function QuestionCard({
             <div
                 className="overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left [&_.box-frame]:border [&_.box-frame]:border-gray-400 [&_.box-frame]:rounded [&_.box-frame]:p-3 [&_.box-frame]:my-1 [&_.box-frame_table]:mb-3 [&_.box-frame_pre]:whitespace-pre-wrap [&_.box-frame_pre]:text-sm"
                 dangerouslySetInnerHTML={{
-                  __html: formatPlaceholderText(question.table),
+                  __html: formatPlaceholderHtml(question.table),
                 }}
             />
         )}
@@ -145,7 +169,7 @@ export function QuestionCard({
                         <div
                             className="mt-1 overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left"
                             dangerouslySetInnerHTML={{
-                              __html: formatPlaceholderText(option),
+                              __html: formatPlaceholderHtml(option),
                             }}
                         />
                       </>
