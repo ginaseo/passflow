@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve, extname } from "node:path";
 import { NextResponse } from "next/server";
 import { getServerDataDir } from "@/lib/serverDataPath";
 import { handleApiError } from "@/lib/apiError";
@@ -14,23 +14,30 @@ const MIME: Record<string, string> = {
 };
 
 export async function GET(
-  _request: Request,
-  context: { params: Promise<{ certId: string; path: string[] }> }
+    _request: Request,
+    context: { params: Promise<{ certId: string; path: string[] }> }
 ) {
   try {
     const { certId, path } = await context.params;
-    if (!path?.length) {
+
+    if (!certId || !path?.length) {
       return NextResponse.json({ error: "Bad request" }, { status: 400 });
     }
 
-    const root = getServerDataDir();
-    const filePath = join(root, certId, "images", ...path);
+    const root = resolve(getServerDataDir());
+    const certRoot = resolve(join(root, certId));
+    const filePath = resolve(join(certRoot, ...path));
+
+    // certId 디렉터리 밖으로 탈출하는 경로 차단
+    if (filePath !== certRoot && !filePath.startsWith(`${certRoot}\\`) && !filePath.startsWith(`${certRoot}/`)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     if (!existsSync(filePath)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
+    const ext = extname(filePath).toLowerCase();
     const contentType = MIME[ext] ?? "application/octet-stream";
     const data = readFileSync(filePath);
 
