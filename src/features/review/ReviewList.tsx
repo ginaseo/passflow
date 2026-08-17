@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 
 interface ReviewListProps {
-  questions: Question[];
+  questions: PublicQuestion[];
   emptyMessage: string;
   onRemove?: (questionId: string) => void;
-  onRetry: (questions: Question[]) => void;
-  metaFor?: (question: Question) => string | null;
+  onRetry: (questions: PublicQuestion[]) => void;
+  metaFor?: (question: PublicQuestion) => string | null;
 }
 
 export function ReviewList({ questions, emptyMessage, onRemove, onRetry, metaFor }: ReviewListProps) {

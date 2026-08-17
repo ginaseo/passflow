@@ -1,11 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { QuestionCard } from "./QuestionCard";
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 
-const BADGE_TEXT = "재구성 문항 — 실제 기출과 다를 수 있음";
+const BADGE_TEXT = "재구성 문항 - 실제 기출과 다를 수 있음";
 
-function baseQuestion(overrides: Partial<Question> = {}): Question {
+function baseQuestion(overrides: Partial<PublicQuestion> = {}): PublicQuestion {
   return {
     questionId: "2023-1-Q1",
     examId: "2023-1",
@@ -14,14 +14,12 @@ function baseQuestion(overrides: Partial<Question> = {}): Question {
     options: ["보기1", "보기2", "보기3", "보기4"],
     subject: 1,
     subjectName: "소프트웨어 설계",
-    answer: 1,
-    explanation: "해설입니다",
     image: null,
     ...overrides,
   };
 }
 
-function renderCard(question: Question) {
+function renderCard(question: PublicQuestion) {
   return renderToStaticMarkup(
     <QuestionCard
       question={question}
@@ -29,6 +27,7 @@ function renderCard(question: Question) {
       total={10}
       selectedAnswer={null}
       showFeedback={false}
+      feedback={null}
       theoryLink={null}
       isFavorited={false}
       onSelect={vi.fn()}

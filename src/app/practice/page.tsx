@@ -5,19 +5,16 @@ import { useSearchParams } from "next/navigation";
 import { PracticeSetup, type PracticeSetupValue } from "@/features/practice/PracticeSetup";
 import { PracticeSession } from "@/features/practice/PracticeSession";
 import { AnswerGrid } from "@/features/practice/AnswerGrid";
-import { pickRandomQuestions, pickSequentialQuestions, pickStratifiedRandomQuestions } from "@/lib/sampling";
-import { getSubjectWeights } from "@/lib/examSubjectWeights";
-import { gradeAnswer } from "@/lib/grading";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
 import { getSubjectLabel } from "@/lib/theory";
 import { getUnansweredQuestions, pickResumeSession } from "@/lib/resumeExam";
-import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import { ApiQuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { getSelectedCertId, DEFAULT_CERT_ID } from "@/lib/cert";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { EntryType, Mode } from "@/types/progress";
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -28,7 +25,7 @@ type Phase =
   | { kind: "loading" }
   | {
       kind: "active";
-      questions: Question[];
+      questions: PublicQuestion[];
       theoryMap: TheoryMap;
       mode: Mode;
       entryType: EntryType;
@@ -41,21 +38,30 @@ type Phase =
   | { kind: "done"; summary: SessionSummary; mode: Mode; entryType: EntryType }
   | { kind: "error"; message: string };
 
+async function resolveSampleCount(
+  value: Extract<PracticeSetupValue, { entryType: "random" }>,
+  certId: string,
+  repo: ApiQuestionRepository
+): Promise<number> {
+  if (value.count !== Infinity) return value.count;
+  const metadata = await repo.getMetadata();
+  if (value.examIds && value.examIds.length > 0) {
+    return value.examIds.reduce((sum, id) => {
+      const exam = metadata.exams.find((e) => e.examId === id);
+      return sum + (exam?.count ?? 0);
+    }, 0);
+  }
+  if (value.subject === "all") return metadata.subjectCounts.all ?? 0;
+  return metadata.subjectCounts[String(value.subject)] ?? 0;
+}
+
 function PracticeContent() {
-  // getSelectedCertId()는 localStorage를 읽으므로 SSR에서는 항상 기본값을 반환한다.
-  // 클라이언트 첫 렌더에서 곧바로 실제 선택값을 읽으면 서버가 만든 HTML(기본값 기준)과
-  // 달라져 hydration mismatch가 나므로, 첫 렌더는 서버와 동일하게 기본값으로 시작하고
-  // 마운트 후 effect에서 실제 값으로 갱신한다.
   const [certId, setCertId] = useState(DEFAULT_CERT_ID);
   useEffect(() => {
-    // localStorage(마운트 시점에만 한 번 읽으면 되는 외부 상태)를 React state로
-    // 동기화하는 것이 이 effect의 유일한 목적이라 setState 직접 호출이 맞다 —
-    // 자격증 전환은 페이지 전체 리로드로 처리되므로(cert.ts) 마운트 중 값이 바뀔
-    // 일이 없어 useSyncExternalStore로 구독할 필요는 없다.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCertId(getSelectedCertId());
   }, []);
-  const questionRepository = useMemo(() => new JsonQuestionRepository(certId), [certId]);
+  const questionRepository = useMemo(() => new ApiQuestionRepository(certId), [certId]);
   const searchParams = useSearchParams();
   const resumeExamId = searchParams.get("resume");
   const [phase, setPhase] = useState<Phase>(resumeExamId ? { kind: "loading" } : { kind: "setup" });
@@ -81,15 +87,10 @@ function PracticeContent() {
   const initialCount: number | undefined =
     countParam && Number.isInteger(countNum) && countNum > 0 ? countNum : undefined;
 
-  // review/page.tsx의 latestRequestId 패턴과 동일 — resumeExamId가 로드 도중
-  // 바뀌면(같은 /practice 인스턴스에서 다른 회차로 재진입) 먼저 시작한 로드가
-  // 나중에 끝나며 최신 상태를 덮어쓰지 않게 막는다.
   const latestResumeRequestId = useRef(0);
 
   useEffect(() => {
     if (!resumeExamId) {
-      // resume 쿼리가 사라졌으면(예: nav의 "문제풀이" 링크로 같은 /practice 인스턴스에
-      // 머무른 채 재진입) 진행 중이던 resume 로드를 무효화하고 setup 화면으로 되돌린다.
       latestResumeRequestId.current++;
       queueMicrotask(() => {
         setPhase((prev) => (prev.kind === "setup" ? prev : { kind: "setup" }));
@@ -111,14 +112,6 @@ function PracticeContent() {
 
         const resumeSession = pickResumeSession(attempts, resumeExamId);
 
-        // entryType이 round가 아니면(random) 원래 문항 집합을 재구성할 방법이 없다 —
-        // 어떤 문항이 원래 뽑혔었는지는 attempt가 기록된 것만 알 수 있고, 안 풀고 넘어간
-        // 문항은 애초에 저장된 적이 없다. 이 경우 기존 동작(학습모드, 안 푼 문항만)으로 대체한다.
-        // 학습모드는 이 복원 경로를 타면 안 된다 — select()가 이미 답한 문항에서 즉시
-        // return하며 정답 피드백이 펼쳐진 채로 나오므로, 시험모드(entryType === "round")에서만 사용한다.
-        // 제한시간이 이미 지난 세션도 제외한다 — 복원하자마자 remaining이 0이라 즉시
-        // 자동제출되는데, submitExam()은 답한 문항만 기록하므로 안 푼 문항은 영원히
-        // 미응시로 남아 "이어서 풀기"를 눌러도 같은 만료 세션을 계속 다시 고르는 루프에 빠진다.
         const isExpired =
           resumeSession !== null &&
           resumeSession.timeLimitMs !== null &&
@@ -181,25 +174,23 @@ function PracticeContent() {
 
     try {
       const theoryMapPromise = questionRepository.getTheoryMap();
-      theoryMapPromise.catch(() => {}); // 실제 에러 처리는 아래 await 시점에서 수행됨 — unhandled rejection 방지용
-      // 설정 조회 실패는 세션 시작을 막지 않는다 — 기본값으로 대체
+      theoryMapPromise.catch(() => {});
       const settingsPromise = settingsRepository.getSettings().catch(() => DEFAULT_SETTINGS);
 
-      let questions: Question[];
+      let questions: PublicQuestion[];
 
       if (value.entryType === "round") {
         const pool = await questionRepository.getQuestions({ examId: value.examId });
         questions = [...pool].sort((a, b) => a.qnum - b.qnum);
       } else {
-        const pool = value.examIds
-          ? (await questionRepository.getQuestions({})).filter((q) => value.examIds!.includes(q.examId))
-          : await questionRepository.getQuestions(value.subject === "all" ? {} : { subject: value.subject });
-        questions =
-          value.order === "sequential"
-            ? pickSequentialQuestions(pool, value.count)
-            : value.subject === "all"
-              ? pickStratifiedRandomQuestions(pool, value.count, Math.random, getSubjectWeights(certId))
-              : pickRandomQuestions(pool, value.count);
+        const count = await resolveSampleCount(value, certId, questionRepository);
+        questions = await questionRepository.sampleQuestions({
+          examIds: value.examIds,
+          subject: value.subject,
+          count,
+          order: value.order,
+          stratified: value.subject === "all",
+        });
       }
 
       const theoryMap = await theoryMapPromise;
@@ -224,7 +215,7 @@ function PracticeContent() {
     }
   }
 
-  async function retryWrong(wrongQuestions: Question[]) {
+  async function retryWrong(wrongQuestions: PublicQuestion[]) {
     if (wrongQuestions.length === 0) return;
     try {
       const [theoryMap, settings] = await Promise.all([
@@ -279,11 +270,11 @@ function PracticeContent() {
   }
 
   if (phase.kind === "done") {
-    const { total, solved, correct, wrong, questions, answers } = phase.summary;
-    const subjectScores = summarizeBySubject(questions, answers);
+    const { total, solved, correct, wrong, questions, answers, correctByIndex } = phase.summary;
+    const subjectScores = summarizeBySubject(questions, answers, correctByIndex);
     const showPassFail = phase.entryType === "round" && phase.mode === "exam";
     const wrongQuestions = questions.filter(
-      (q, i) => !(i in answers) || !gradeAnswer(q, answers[i])
+      (q, i) => !(i in answers) || correctByIndex?.[i] !== true
     );
 
     return (
@@ -308,7 +299,12 @@ function PracticeContent() {
             </ul>
           </div>
         )}
-        <AnswerGrid questions={questions} mode="result" answers={answers} />
+        <AnswerGrid
+          questions={questions}
+          mode="result"
+          answers={answers}
+          correctByIndex={correctByIndex}
+        />
         {wrongQuestions.length > 0 && (
           <button
             type="button"
@@ -331,6 +327,7 @@ function PracticeContent() {
 
   return (
     <PracticeSession
+      questionRepository={questionRepository}
       questions={phase.questions}
       theoryMap={phase.theoryMap}
       mode={phase.mode}

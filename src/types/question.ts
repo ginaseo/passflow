@@ -1,3 +1,5 @@
+export type PublicQuestion = Omit<Question, "answer" | "explanation">;
+
 export interface Question {
   questionId: string;
   examId: string;
@@ -11,8 +13,6 @@ export interface Question {
   image: string | null;
   table?: string;
   sinagong?: string;
-  // false면 원본 출처에 실제 정답이 없어 AI가 추측 없이 새로 구성한 문항이라는 뜻 —
-  // 실제 기출과 다를 수 있다. true/미지정(대부분)은 원 출처의 정답을 그대로 썼다는 뜻.
   verified?: boolean;
 }
 
@@ -26,4 +26,44 @@ export interface ExamSummary {
   examId: string;
   title: string;
   count: number;
+}
+
+export interface CertMetadata {
+  exams: ExamSummary[];
+  subjects: { subject: number; subjectName?: string; count: number }[];
+  subjectCounts: Record<string, number>;
+}
+
+export interface SampleParams {
+  examIds?: string[];
+  subject?: number | "all";
+  count: number;
+  order: "random" | "sequential";
+  stratified?: boolean;
+}
+
+export interface GradeResult {
+  correct: boolean;
+  correctAnswer: number | number[];
+  explanation: string;
+}
+
+export interface SubmitAnswerItem {
+  questionId: string;
+  selectedAnswer: number;
+}
+
+export interface SubmitResultItem {
+  questionId: string;
+  correct: boolean;
+  correctAnswer: number | number[];
+  explanation: string;
+}
+
+export interface SubmitResult {
+  results: SubmitResultItem[];
+  total: number;
+  solved: number;
+  correct: number;
+  wrong: number;
 }

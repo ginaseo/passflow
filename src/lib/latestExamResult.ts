@@ -1,7 +1,7 @@
 import { tryParseQuestionId } from "./questionId";
 import { isPassed, type SubjectScore } from "./summary";
 import type { Attempt } from "@/types/progress";
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 
 export function listExamSessions(
   attempts: Attempt[]
@@ -27,7 +27,7 @@ export function listExamSessions(
 }
 
 export function scoreExamSession(
-  questions: Question[],
+  questions: PublicQuestion[],
   attempts: Attempt[],
   examId: string,
   sessionId: string
@@ -74,7 +74,7 @@ export function scoreExamSession(
 }
 
 export function getExamSessionWrongQuestionIds(
-  questions: Question[],
+  questions: PublicQuestion[],
   attempts: Attempt[],
   examId: string,
   sessionId: string

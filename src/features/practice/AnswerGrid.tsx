@@ -1,22 +1,29 @@
 "use client";
 
-import { gradeAnswer } from "@/lib/grading";
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 
 interface AnswerGridProps {
-  questions: Question[];
+  questions: PublicQuestion[];
   mode: "progress" | "result";
   answers: Record<number, number>;
+  correctByIndex?: Record<number, boolean>;
   currentIndex?: number;
   onJump?: (index: number) => void;
 }
 
-export function AnswerGrid({ questions, mode, answers, currentIndex, onJump }: AnswerGridProps) {
+export function AnswerGrid({
+  questions,
+  mode,
+  answers,
+  correctByIndex,
+  currentIndex,
+  onJump,
+}: AnswerGridProps) {
   return (
     <div className="max-w-xl mx-auto w-full grid grid-cols-10 gap-0.5 p-2">
       {questions.map((question, i) => {
         const answered = i in answers;
-        const isCorrect = answered && gradeAnswer(question, answers[i]);
+        const isCorrect = answered && correctByIndex?.[i] === true;
         const isCurrent = i === currentIndex;
 
         let style: string;

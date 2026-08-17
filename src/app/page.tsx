@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
-import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import { ApiQuestionRepository } from "@/repositories/QuestionRepository";
 import { pickResumeExamId } from "@/lib/resumeExam";
 import { getSelectedCertId } from "@/lib/cert";
 import { computeDashboardSummary, scopeAttemptsToExams } from "@/lib/dashboardSummary";
@@ -16,7 +16,7 @@ function formatPercent(ratio: number): string {
 }
 
 export default function HomePage() {
-  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
+  const questionRepository = useMemo(() => new ApiQuestionRepository(getSelectedCertId()), []);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [resumeExam, setResumeExam] = useState<{ examId: string; title: string } | null>(null);

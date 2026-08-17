@@ -1,4 +1,4 @@
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 import type { TheoryLink, TheoryMap } from "@/types/theory";
 
 export const SUBJECT_NAMES: Record<number, string> = {
@@ -30,14 +30,14 @@ export function isTheoryNameTruncated(name: string): boolean {
 
 // 문항 자체에 실려오는 subjectName이 자격증별 실제 과목명이다(정처기는 SUBJECT_NAMES와 동일
 // 텍스트, SQLD 등 다른 자격증은 과목 구성이 다르므로 SUBJECT_NAMES를 그대로 쓰면 틀린다).
-export function getSubjectLabel(question: Pick<Question, "subject" | "subjectName">): string {
+export function getSubjectLabel(question: Pick<PublicQuestion, "subject" | "subjectName">): string {
   // SUBJECT_NAMES(정처기 하드코딩 폴백)는 이미 "N과목 " 접두사를 포함하고 있어 그대로 쓴다 —
   // subjectName(문항에 실려오는 실제 과목명)은 접두사가 없어 여기서 붙여야 한다.
   if (question.subjectName) return `${question.subject}과목 ${question.subjectName}`;
   return SUBJECT_NAMES[question.subject] ?? `${question.subject}과목`;
 }
 
-export function resolveTheoryLink(question: Question, theoryMap: TheoryMap): TheoryLink {
+export function resolveTheoryLink(question: PublicQuestion, theoryMap: TheoryMap): TheoryLink {
   const subjectName = getSubjectLabel(question);
 
   if (question.sinagong) {

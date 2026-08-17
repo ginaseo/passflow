@@ -1,20 +1,37 @@
 "use client";
 
-import { isCorrectOption } from "@/lib/grading";
 import { getSubjectLabel } from "@/lib/theory";
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 import type { TheoryLink } from "@/types/theory";
 
+export interface QuestionFeedback {
+  correct: boolean;
+  explanation: string;
+  correctAnswer: number | number[];
+}
+
 interface QuestionCardProps {
-  question: Question;
+  question: PublicQuestion;
   index: number;
   total: number;
   selectedAnswer: number | null;
   showFeedback: boolean;
+  feedback: QuestionFeedback | null;
   theoryLink: TheoryLink | null;
   isFavorited: boolean;
   onSelect: (answer: number) => void;
   onFavorite: () => void;
+}
+
+function isCorrectOption(feedback: QuestionFeedback, optionNumber: number): boolean {
+  return Array.isArray(feedback.correctAnswer)
+    ? feedback.correctAnswer.includes(optionNumber)
+    : optionNumber === feedback.correctAnswer;
+}
+
+function imageSrc(image: string): string {
+  if (image.startsWith("/api/media/")) return image;
+  return `/api/media/${image}`;
 }
 
 export function QuestionCard({
@@ -23,13 +40,13 @@ export function QuestionCard({
   total,
   selectedAnswer,
   showFeedback,
+  feedback,
   theoryLink,
   isFavorited,
   onSelect,
   onFavorite,
 }: QuestionCardProps) {
-  const isCorrect =
-    showFeedback && selectedAnswer !== null && isCorrectOption(question, selectedAnswer);
+  const isCorrect = showFeedback && feedback !== null && feedback.correct;
 
   return (
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
@@ -51,7 +68,7 @@ export function QuestionCard({
 
       {question.image && (
         <img
-          src={`/data/${question.image}`}
+          src={imageSrc(question.image)}
           alt="문항 이미지"
           className="max-w-full max-h-[420px] w-auto object-contain rounded border mx-auto"
         />
@@ -68,7 +85,7 @@ export function QuestionCard({
         {question.options.map((option, i) => {
           const optionNumber = i + 1;
           const isSelected = selectedAnswer === optionNumber;
-          const isAnswer = isCorrectOption(question, optionNumber);
+          const isAnswer = showFeedback && feedback !== null && isCorrectOption(feedback, optionNumber);
 
           let style = "border-gray-300";
           if (showFeedback && isAnswer) style = "border-green-600 bg-green-50";
@@ -101,12 +118,12 @@ export function QuestionCard({
         })}
       </div>
 
-      {showFeedback && (
+      {showFeedback && feedback && (
         <div className="flex flex-col gap-2 mt-2 p-3 rounded bg-gray-50">
           <p className={isCorrect ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
             {isCorrect ? "정답" : "오답"}
           </p>
-          <p className="text-sm whitespace-pre-wrap">{question.explanation}</p>
+          <p className="text-sm whitespace-pre-wrap">{feedback.explanation}</p>
           {theoryLink && (
             <p className="text-sm text-blue-700">
               관련 이론: {theoryLink.label} (p.{theoryLink.page})

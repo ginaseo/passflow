@@ -8,10 +8,10 @@ export function CertSelector() {
   const [certId] = useState<string>(() => getSelectedCertId());
 
   useEffect(() => {
-    fetch("/data/certs.json")
+    fetch("/api/certificates", { credentials: "include" })
       .then((res) => res.json() as Promise<CertInfo[]>)
       .then(setCerts)
-      .catch((err) => console.error("certs.json 로드 실패:", err));
+      .catch((err) => console.error("certificates API 로드 실패:", err));
   }, []);
 
   // 자격증이 하나뿐이면 선택지를 보여줄 필요가 없다.
