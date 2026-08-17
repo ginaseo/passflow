@@ -24,7 +24,10 @@ interface QuestionCardProps {
   onFavorite: () => void;
 }
 
-function isCorrectOption(feedback: QuestionFeedback, optionNumber: number): boolean {
+function isCorrectOption(
+    feedback: QuestionFeedback,
+    optionNumber: number
+): boolean {
   return Array.isArray(feedback.correctAnswer)
       ? feedback.correctAnswer.includes(optionNumber)
       : optionNumber === feedback.correctAnswer;
@@ -36,7 +39,9 @@ function imageSrc(image: string): string {
 }
 
 function formatPlaceholderText(text: string): string {
-  return text.replace(/(?<!\[)㉠(?!\])/g, "[㉠]").replace(/(?<!\[)㉡(?!\])/g, "[㉡]");
+  return text
+  .replace(/(?<!\[)㉠(?!\])/g, "[㉠]")
+  .replace(/(?<!\[)㉡(?!\])/g, "[㉡]");
 }
 
 export function QuestionCard({
@@ -64,8 +69,15 @@ export function QuestionCard({
             </span>
           )}
         </span>
-          <button type="button" onClick={onFavorite} className="text-yellow-600">
-            {isFavorited ? "\uC990\uACA8\uCC3E\uAE30 \uC644\uB8CC" : "\uC990\uACA8\uCC3E\uAE30"}
+
+          <button
+              type="button"
+              onClick={onFavorite}
+              className="text-yellow-600"
+          >
+            {isFavorited
+                ? "\uC990\uACA8\uCC3E\uAE30 \uC644\uB8CC"
+                : "\uC990\uACA8\uCC3E\uAE30"}
           </button>
         </div>
 
@@ -89,7 +101,9 @@ export function QuestionCard({
         {question.table && (
             <div
                 className="overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left [&_.box-frame]:border [&_.box-frame]:border-gray-400 [&_.box-frame]:rounded [&_.box-frame]:p-3 [&_.box-frame]:my-1 [&_.box-frame_table]:mb-3 [&_.box-frame_pre]:whitespace-pre-wrap [&_.box-frame_pre]:text-sm"
-                dangerouslySetInnerHTML={{ __html: question.table }}
+                dangerouslySetInnerHTML={{
+                  __html: formatPlaceholderText(question.table),
+                }}
             />
         )}
 
@@ -103,9 +117,14 @@ export function QuestionCard({
                 isCorrectOption(feedback, optionNumber);
 
             let style = "border-gray-300";
-            if (showFeedback && isAnswer) style = "border-green-600 bg-green-50";
-            else if (showFeedback && isSelected && !isAnswer) style = "border-red-600 bg-red-50";
-            else if (isSelected) style = "border-blue-600";
+
+            if (showFeedback && isAnswer) {
+              style = "border-green-600 bg-green-50";
+            } else if (showFeedback && isSelected && !isAnswer) {
+              style = "border-red-600 bg-red-50";
+            } else if (isSelected) {
+              style = "border-blue-600";
+            }
 
             const hasTable = option.includes("<table");
 
@@ -115,14 +134,19 @@ export function QuestionCard({
                     type="button"
                     disabled={showFeedback}
                     onClick={() => onSelect(optionNumber)}
-                    className={`text-left px-3 py-2 rounded border ${hasTable ? "" : "whitespace-pre-wrap"} ${style}`}
+                    className={`text-left px-3 py-2 rounded border ${
+                        hasTable ? "" : "whitespace-pre-wrap"
+                    } ${style}`}
                 >
                   {hasTable ? (
                       <>
                         <span>{optionNumber}.</span>
+
                         <div
                             className="mt-1 overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left"
-                            dangerouslySetInnerHTML={{ __html: option }}
+                            dangerouslySetInnerHTML={{
+                              __html: formatPlaceholderText(option),
+                            }}
                         />
                       </>
                   ) : (
@@ -135,15 +159,24 @@ export function QuestionCard({
 
         {showFeedback && feedback && (
             <div className="flex flex-col gap-2 mt-2 p-3 rounded bg-gray-50">
-              <p className={isCorrect ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
+              <p
+                  className={
+                    isCorrect
+                        ? "text-green-700 font-medium"
+                        : "text-red-700 font-medium"
+                  }
+              >
                 {isCorrect ? "\uC815\uB2F5" : "\uC624\uB2F5"}
               </p>
+
               <p className="text-sm whitespace-pre-wrap">
                 {formatPlaceholderText(feedback.explanation)}
               </p>
+
               {theoryLink && (
                   <p className="text-sm text-blue-700">
-                    {"\uAD00\uB828 \uC774\uB860"}: {theoryLink.label} (p.{theoryLink.page})
+                    {"\uAD00\uB828 \uC774\uB860"}: {theoryLink.label} (p.
+                    {theoryLink.page})
                   </p>
               )}
             </div>
