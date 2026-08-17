@@ -11,7 +11,8 @@ import { getExamSessionWrongQuestionIds, listExamSessions } from "@/lib/latestEx
 import { getSubjectLabel } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
-import { ApiQuestionRepository, type QuestionRepository } from "@/repositories/QuestionRepository";
+import { ApiQuestionRepository } from "@/repositories/ApiQuestionRepository";
+import type { QuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { getSelectedCertId } from "@/lib/cert";

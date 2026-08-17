@@ -8,7 +8,7 @@ import { AnswerGrid } from "@/features/practice/AnswerGrid";
 import { isPassed, isSubjectFailed, summarizeBySubject, type SessionSummary } from "@/lib/summary";
 import { getSubjectLabel } from "@/lib/theory";
 import { getUnansweredQuestions, pickResumeSession } from "@/lib/resumeExam";
-import { ApiQuestionRepository } from "@/repositories/QuestionRepository";
+import { ApiQuestionRepository } from "@/repositories/ApiQuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { getSelectedCertId, DEFAULT_CERT_ID } from "@/lib/cert";

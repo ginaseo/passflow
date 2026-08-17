@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ApiAccessError } from "@/repositories/QuestionRepository";
+import { ApiAccessError } from "@/repositories/ApiQuestionRepository";
 
 interface UnlockGateProps {
   children: React.ReactNode;

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
-import { ApiQuestionRepository } from "@/repositories/QuestionRepository";
+import { ApiQuestionRepository } from "@/repositories/ApiQuestionRepository";
 import { pickResumeExamId } from "@/lib/resumeExam";
 import { getSelectedCertId } from "@/lib/cert";
 import { computeDashboardSummary, scopeAttemptsToExams } from "@/lib/dashboardSummary";

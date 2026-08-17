@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { JsonQuestionRepository } from "./QuestionRepository";
+import { JsonQuestionRepository } from "./JsonQuestionRepository";
 
 const examsIndexFixture = [
   { examId: "2023-1", title: "2023년 1회", count: 2 },
