@@ -38,13 +38,13 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-function mapImageUrl(question: PublicQuestion): PublicQuestion {
+function mapImageUrl(certId: string, question: PublicQuestion): PublicQuestion {
   if (!question.image) return question;
   return {
     ...question,
     image: question.image.startsWith("/api/media/")
       ? question.image
-      : `/api/media/${question.image}`,
+      : `/api/media/${certId}/${question.image}`,
   };
 }
 
@@ -72,7 +72,7 @@ export class ApiQuestionRepository implements QuestionRepository {
     const q = await apiFetch<PublicQuestion>(
       `/api/${this.certId}/questions/${encodeURIComponent(questionId)}`
     );
-    return mapImageUrl(q);
+    return mapImageUrl(this.certId, q);
   }
 
   async getQuestions(filter: {
@@ -84,7 +84,7 @@ export class ApiQuestionRepository implements QuestionRepository {
       const qs = await apiFetch<PublicQuestion[]>(
         `/api/${this.certId}/exams/${encodeURIComponent(filter.examId)}/questions`
       );
-      const mapped = qs.map(mapImageUrl);
+      const mapped = qs.map((q) => mapImageUrl(this.certId, q));
       return filter.subject === undefined
         ? mapped
         : mapped.filter((q) => q.subject === filter.subject);
@@ -98,7 +98,7 @@ export class ApiQuestionRepository implements QuestionRepository {
           )
         )
       );
-      const all = perExam.flat().map(mapImageUrl);
+      const all = perExam.flat().map((q) => mapImageUrl(this.certId, q));
       return filter.subject === undefined
         ? all
         : all.filter((q) => q.subject === filter.subject);
@@ -121,7 +121,7 @@ export class ApiQuestionRepository implements QuestionRepository {
       method: "POST",
       body: JSON.stringify(params),
     });
-    return qs.map(mapImageUrl);
+    return qs.map((q) => mapImageUrl(this.certId, q));
   }
 
   async gradeQuestion(questionId: string, answer: number): Promise<GradeResult> {

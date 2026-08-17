@@ -53,15 +53,15 @@ export function QuestionCard({
     <div className="max-w-xl mx-auto p-6 flex flex-col gap-4">
       <div className="flex items-center justify-between text-sm text-gray-500">
         <span>
-          {index + 1} / {total} 쨌 ?먮낯 {question.qnum}踰?쨌 {getSubjectLabel(question)}
+          {index + 1} / {total} / {question.qnum} / {getSubjectLabel(question)}
           {question.verified === false && (
             <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-xs align-middle">
-              재구성 문항 - 실제 기출과 다를 수 있음
+              {"\uC7AC\uAD6C\uC131 \uBB38\uD56D - \uC2E4\uC81C \uAE30\uCD9C\uACFC \uB2E4\uB97C \uC218 \uC788\uC74C"}
             </span>
           )}
         </span>
         <button type="button" onClick={onFavorite} className="text-yellow-600">
-          {isFavorited ? "??利먭꺼李얘린 ?꾨즺" : "??利먭꺼李얘린"}
+          {isFavorited ? "\uC990\uACA8\uCC3E\uAE30 \uC644\uB8CC" : "\uC990\uACA8\uCC3E\uAE30"}
         </button>
       </div>
 
@@ -71,7 +71,7 @@ export function QuestionCard({
         <div className="relative mx-auto h-[320px] w-full max-w-full">
           <Image
             src={imageSrc(question.image)}
-            alt="문항 이미지"
+            alt="\uBB38\uD56D \uC774\uBBF8\uC9C0"
             fill
             sizes="(max-width: 768px) 100vw, 640px"
             className="rounded border object-contain"
@@ -127,12 +127,12 @@ export function QuestionCard({
       {showFeedback && feedback && (
         <div className="flex flex-col gap-2 mt-2 p-3 rounded bg-gray-50">
           <p className={isCorrect ? "text-green-700 font-medium" : "text-red-700 font-medium"}>
-            {isCorrect ? "?뺣떟" : "?ㅻ떟"}
+            {isCorrect ? "\uC815\uB2F5" : "\uC624\uB2F5"}
           </p>
           <p className="text-sm whitespace-pre-wrap">{feedback.explanation}</p>
           {theoryLink && (
             <p className="text-sm text-blue-700">
-              愿???대줎: {theoryLink.label} (p.{theoryLink.page})
+              {"\uAD00\uB828 \uC774\uB860"}: {theoryLink.label} (p.{theoryLink.page})
             </p>
           )}
         </div>
