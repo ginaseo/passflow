@@ -143,6 +143,31 @@ export class JsonQuestionRepository implements QuestionRepository {
     return toPublicQuestion(found);
   }
 
+  async getQuestionsByIds(questionIds: string[]): Promise<PublicQuestion[]> {
+    const byExam = new Map<string, number[]>();
+    for (const id of questionIds) {
+      const { examId, qnum } = parseQuestionId(id);
+      const qnums = byExam.get(examId);
+      if (qnums) qnums.push(qnum);
+      else byExam.set(examId, [qnum]);
+    }
+
+    const result: PublicQuestion[] = [];
+    for (const [examId, qnums] of byExam) {
+      const qnumSet = new Set(qnums);
+      let questions;
+      try {
+        questions = await this.loadExam(examId);
+      } catch {
+        continue;
+      }
+      for (const q of questions) {
+        if (qnumSet.has(q.qnum)) result.push(toPublicQuestion(q));
+      }
+    }
+    return result;
+  }
+
   async getQuestions(filter: {
     examId?: string;
     subject?: number;

@@ -164,6 +164,33 @@ export class FsQuestionRepository {
     return found;
   }
 
+  // review/dashboard가 questionId마다 개별 조회하던 N+1을 없애기 위한 배치 조회 —
+  // examId별로 그룹핑해 시험 파일을 한 번씩만 읽는다.
+  getQuestionsByIds(questionIds: string[]): Question[] {
+    const byExam = new Map<string, number[]>();
+    for (const id of questionIds) {
+      const { examId, qnum } = parseQuestionId(id);
+      const qnums = byExam.get(examId);
+      if (qnums) qnums.push(qnum);
+      else byExam.set(examId, [qnum]);
+    }
+
+    const result: Question[] = [];
+    for (const [examId, qnums] of byExam) {
+      const qnumSet = new Set(qnums);
+      let questions: Question[];
+      try {
+        questions = this.loadExam(examId);
+      } catch {
+        continue; // 더 이상 존재하지 않는 examId는 조용히 건너뛴다(호출부가 diff로 감지)
+      }
+      for (const q of questions) {
+        if (qnumSet.has(q.qnum)) result.push(q);
+      }
+    }
+    return result;
+  }
+
   getQuestions(filter: { examId?: string; subject?: number; examIds?: string[] }): Question[] {
     let examIds: string[];
     if (filter.examId) {

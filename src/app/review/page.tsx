@@ -11,7 +11,7 @@ import { getExamSessionWrongQuestionIds, listExamSessions } from "@/lib/latestEx
 import { getSubjectLabel } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
-import { ApiQuestionRepository, QuestionNotFoundError } from "@/repositories/ApiQuestionRepository";
+import { ApiQuestionRepository } from "@/repositories/ApiQuestionRepository";
 import type { QuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
@@ -47,20 +47,23 @@ async function hydrate(
   questionRepository: QuestionRepository,
   questionIds: string[]
 ): Promise<{ questions: PublicQuestion[]; notFoundIds: string[] }> {
-  const results = await Promise.allSettled(
-    questionIds.map((id) => questionRepository.getQuestion(id))
-  );
+  if (questionIds.length === 0) return { questions: [], notFoundIds: [] };
+
+  // 문항 하나하나 개별 fetch하면 오답노트/즐겨찾기가 쌓일수록 요청 수가 N개로
+  // 불어난다 — questionId를 한 번에 배치 조회한다. 배치 응답은 examId별로 묶여
+  // 나오므로, 화면에 보여줄 순서(최근 추가순 등)를 지키려면 questionIds 순서
+  // 그대로 재정렬해야 한다.
+  const fetched = await questionRepository.getQuestionsByIds(questionIds);
+  const byId = new Map(fetched.map((q) => [q.questionId, q]));
   const questions: PublicQuestion[] = [];
   const notFoundIds: string[] = [];
-  results.forEach((r, i) => {
-    if (r.status === "fulfilled") {
-      questions.push(r.value);
-    } else if (r.reason instanceof QuestionNotFoundError) {
-      // 데이터 개편 등으로 더 이상 존재하지 않는 문항이다 — 호출부가 오답노트/
-      // 즐겨찾기에서 정리할 수 있도록 알려준다(재조회할 때마다 반복 404 방지).
-      notFoundIds.push(questionIds[i]);
-    }
-  });
+  for (const id of questionIds) {
+    const q = byId.get(id);
+    if (q) questions.push(q);
+    // 데이터 개편 등으로 더 이상 존재하지 않는 문항이다 — 호출부가 오답노트/
+    // 즐겨찾기에서 정리할 수 있도록 알려준다(재조회할 때마다 반복 404 방지).
+    else notFoundIds.push(id);
+  }
   return { questions, notFoundIds };
 }
 

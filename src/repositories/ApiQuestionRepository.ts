@@ -129,7 +129,22 @@ export class ApiQuestionRepository implements QuestionRepository {
       });
     }
 
-    throw new Error("getQuestions requires examId, examIds, or subject filter");
+    // 빈 필터는 Fs/JsonQuestionRepository와 동일하게 전체 문항을 반환한다
+    // (구현체마다 동작이 갈리면 호출부를 구현체 간에 교체할 때 런타임 오류가 난다).
+    const metadata = await this.getMetadata();
+    return this.getQuestions({ examIds: metadata.exams.map((e) => e.examId) });
+  }
+
+  async getQuestionsByIds(questionIds: string[]): Promise<PublicQuestion[]> {
+    if (questionIds.length === 0) return [];
+    const qs = await apiFetch<PublicQuestion[]>(
+        `/api/${this.certId}/questions/batch`,
+        {
+          method: "POST",
+          body: JSON.stringify({ questionIds }),
+        }
+    );
+    return qs.map((q) => mapImageUrl(q));
   }
 
   async sampleQuestions(params: SampleParams): Promise<PublicQuestion[]> {
