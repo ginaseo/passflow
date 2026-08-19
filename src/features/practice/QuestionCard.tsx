@@ -104,11 +104,14 @@ export function QuestionCard({
   // 보기가 각각 별도 영역)을 그대로 유지한다 — questionId 접두사로 구분한다
   // (jcg는 접두사가 없다, @/lib/questionId 참고).
   const isSqld = question.questionId.startsWith("sqld:");
-  // 표(결과 보기 옵션 포함)가 있는 문항은 PC에서 가로스크롤 없이 다 보이게 카드를
-  // 넓힌다 — 모바일은 max-w-xl이 어차피 화면폭보다 커서 영향 없고, 표는 계속
-  // overflow-x-auto로 가로스크롤된다. 문제 본문/보기 텍스트는 넓어진 카드 안에서도
-  // 다시 max-w-xl로 좁혀 가독성을 유지한다.
-  const hasWideContent = Boolean(question.table) || question.options.some((o) => o.includes("<table"));
+  // 실제 <table> 태그가 있는 문항만 PC에서 가로스크롤 없이 다 보이게 카드를
+  // 넓힌다 — question.table 필드가 있어도 짧은 텍스트/SQL뿐이면(예: 1_25) 넓힐
+  // 이유가 없다(그러면 같은 박스 레이아웃인 이미지뿐인 문항과 폭이 달라져
+  // 어색해 보인다). 모바일은 max-w-xl이 어차피 화면폭보다 커서 영향 없고, 표는
+  // 계속 overflow-x-auto로 가로스크롤된다. 문제 본문/보기 텍스트는 넓어진 카드
+  // 안에서도 다시 max-w-xl로 좁혀 가독성을 유지한다.
+  const hasWideContent =
+      Boolean(question.table?.includes("<table")) || question.options.some((o) => o.includes("<table"));
   const cardWidthClass = hasWideContent ? "max-w-xl sm:max-w-3xl lg:max-w-5xl" : "max-w-xl";
 
   const multiSelectHint = isMultiSelect && !showFeedback && (
