@@ -14,7 +14,7 @@ import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { getSelectedCertId, DEFAULT_CERT_ID } from "@/lib/cert";
 import { DEFAULT_SETTINGS } from "@/types/settings";
 import type { EntryType, Mode } from "@/types/progress";
-import type { PublicQuestion } from "@/types/question";
+import type { PublicQuestion, SelectedAnswer } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -31,7 +31,7 @@ type Phase =
       entryType: EntryType;
       timeLimitMs: number | null;
       autoSaveWrongNotes: boolean;
-      initialAnswers?: Record<number, number>;
+      initialAnswers?: Record<number, SelectedAnswer>;
       initialSessionId?: string;
       initialSessionStartedAt?: number;
     }
@@ -123,7 +123,7 @@ function PracticeContent() {
             return;
           }
 
-          const initialAnswers: Record<number, number> = {};
+          const initialAnswers: Record<number, SelectedAnswer> = {};
           questions.forEach((q, index) => {
             const answer = resumeSession.answersByQnum[q.qnum];
             if (answer !== undefined) initialAnswers[index] = answer;

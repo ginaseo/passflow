@@ -10,15 +10,19 @@ export async function POST(
   try {
     const { certId, questionId } = await context.params;
     const decodedId = decodeURIComponent(questionId);
-    const body = (await request.json()) as { answer?: number };
+    const body = (await request.json()) as { answer?: number | number[] };
 
-    if (body.answer === undefined || !Number.isInteger(body.answer) || body.answer < 1) {
+    const isValidAnswer =
+      Number.isInteger(body.answer) ? (body.answer as number) >= 1
+        : Array.isArray(body.answer) && body.answer.length > 0 && body.answer.every((n) => Number.isInteger(n) && n >= 1);
+
+    if (!isValidAnswer) {
       return NextResponse.json({ error: "Bad request" }, { status: 400 });
     }
 
     const repo = getFsQuestionRepository(certId);
     const question = repo.getQuestion(decodedId);
-    const correct = gradeAnswer(question, body.answer);
+    const correct = gradeAnswer(question, body.answer as number | number[]);
 
     return NextResponse.json({
       correct,

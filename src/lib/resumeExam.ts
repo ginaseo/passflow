@@ -1,7 +1,7 @@
 import { computeExamStatuses, pickMostRecentlyTouchedExam } from "./examStatus";
 import { parseQuestionId } from "./questionId";
 import type { Attempt, EntryType, Mode } from "@/types/progress";
-import type { ExamSummary, PublicQuestion } from "@/types/question";
+import type { ExamSummary, PublicQuestion, SelectedAnswer } from "@/types/question";
 
 export function pickResumeExamId(exams: ExamSummary[], attempts: Attempt[]): string | null {
   const statuses = computeExamStatuses(exams, attempts);
@@ -30,7 +30,7 @@ export interface ResumeSession {
   entryType: EntryType;
   timeLimitMs: number | null;
   startedAt: number;
-  answersByQnum: Record<number, number>;
+  answersByQnum: Record<number, SelectedAnswer>;
 }
 
 export function pickResumeSession(attempts: Attempt[], examId: string): ResumeSession | null {
@@ -56,7 +56,7 @@ export function pickResumeSession(attempts: Attempt[], examId: string): ResumeSe
     if (!prev || a.solvedAt > prev.solvedAt) byQnum.set(qnum, a);
   }
 
-  const answersByQnum: Record<number, number> = {};
+  const answersByQnum: Record<number, SelectedAnswer> = {};
   for (const [qnum, a] of byQnum) answersByQnum[qnum] = a.selectedAnswer;
 
   return {

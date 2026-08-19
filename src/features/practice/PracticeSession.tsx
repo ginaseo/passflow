@@ -11,7 +11,7 @@ import type { QuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import type { EntryType, Mode } from "@/types/progress";
-import type { PublicQuestion } from "@/types/question";
+import type { PublicQuestion, SelectedAnswer } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 interface PracticeSessionProps {
@@ -23,7 +23,7 @@ interface PracticeSessionProps {
   timeLimitMs: number | null;
   autoSaveWrongNotes: boolean;
   onFinish: (summary: SessionSummary) => void;
-  initialAnswers?: Record<number, number>;
+  initialAnswers?: Record<number, SelectedAnswer>;
   initialSessionId?: string;
   initialSessionStartedAt?: number;
 }
@@ -63,7 +63,7 @@ export function PracticeSession({
   initialSessionStartedAt,
 }: PracticeSessionProps) {
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>(() => initialAnswers ?? {});
+  const [answers, setAnswers] = useState<Record<number, SelectedAnswer>>(() => initialAnswers ?? {});
   const [feedbackByIndex, setFeedbackByIndex] = useState<Record<number, QuestionFeedback>>({});
   const [favorited, setFavorited] = useState<Record<number, boolean>>({});
   const [questionStartedAt, setQuestionStartedAt] = useState(() => Date.now());
@@ -88,7 +88,12 @@ export function PracticeSession({
   const showFeedback = mode === "study" && selectedAnswer !== null && feedback !== null;
   const remaining =
     timeLimitMs !== null ? remainingMs(sessionStartedAt, now, timeLimitMs) : null;
-  const allAnswered = Object.keys(answers).length === questions.length;
+  const allAnswered = questions.every((q, i) => {
+    const required = q.answerCount ?? 1;
+    const a = answers[i];
+    const count = a === undefined ? 0 : Array.isArray(a) ? a.length : 1;
+    return count >= required;
+  });
 
   useEffect(() => {
     progressRepository.getFavorites().then(
@@ -112,13 +117,33 @@ export function PracticeSession({
     setQuestionStartedAt(Date.now());
   }
 
-  async function select(answer: number) {
-    if (mode === "study") {
-      if (selectedAnswer !== null) return;
-      setAnswers((prev) => ({ ...prev, [current]: answer }));
+  // "2개 고르시오" 같은 문항은 정답 개수(question.answerCount)만큼 고를 때까지는
+  // 채점하지 않는다 — 그 전까지는 answers에 진행 중인 선택만 반영한다. 정답이 1개인
+  // 문항은 항상 requiredCount===1이라 클릭 즉시 채점되는 기존 동작 그대로다.
+  async function select(optionNumber: number) {
+    const requiredCount = question.answerCount ?? 1;
+    const current_ = answers[current];
+    const currentSet = current_ === undefined ? [] : Array.isArray(current_) ? current_ : [current_];
 
+    let nextSet: number[];
+    if (requiredCount === 1) {
+      if (currentSet.length > 0) return;
+      nextSet = [optionNumber];
+    } else if (currentSet.includes(optionNumber)) {
+      nextSet = currentSet.filter((n) => n !== optionNumber);
+    } else {
+      if (currentSet.length >= requiredCount) return;
+      nextSet = [...currentSet, optionNumber];
+    }
+
+    const nextValue: SelectedAnswer = requiredCount > 1 ? nextSet : optionNumber;
+    setAnswers((prev) => ({ ...prev, [current]: nextValue }));
+
+    if (nextSet.length < requiredCount) return;
+
+    if (mode === "study") {
       try {
-        const grade = await questionRepository.gradeQuestion(question.questionId, answer);
+        const grade = await questionRepository.gradeQuestion(question.questionId, nextValue);
         setFeedbackByIndex((prev) => ({
           ...prev,
           [current]: {
@@ -135,7 +160,7 @@ export function PracticeSession({
               solvedAt: Date.now(),
               mode,
               entryType,
-              selectedAnswer: answer,
+              selectedAnswer: nextValue,
               isCorrect: grade.correct,
               solveTimeMs: Date.now() - questionStartedAt,
               sessionId,
@@ -166,7 +191,6 @@ export function PracticeSession({
         console.error("gradeQuestion failed:", err);
       }
     } else {
-      setAnswers((prev) => ({ ...prev, [current]: answer }));
       trackWrite(
         progressRepository
           .recordAttempt({
@@ -174,7 +198,7 @@ export function PracticeSession({
             solvedAt: Date.now(),
             mode,
             entryType,
-            selectedAnswer: answer,
+            selectedAnswer: nextValue,
             isCorrect: false,
             solveTimeMs: Date.now() - questionStartedAt,
             sessionId,
@@ -285,10 +309,6 @@ export function PracticeSession({
         goTo(current + 1);
       } else if (e.key === "ArrowLeft") {
         goTo(current - 1);
-      } else if (e.key === "ArrowDown") {
-        goTo(current + (mode === "exam" ? 10 : 1));
-      } else if (e.key === "ArrowUp") {
-        goTo(current - (mode === "exam" ? 10 : 1));
       } else if (e.key === "f" || e.key === "F") {
         toggleFavorite();
       }
@@ -352,7 +372,7 @@ export function PracticeSession({
         >
           ← 이전
         </button>
-        <span>Space: 다음 · ←→: 이전/다음 · ↑↓: 이동 · 1~4: 답 선택 · F: 즐겨찾기</span>
+        <span>Space: 다음 · ←→: 이전/다음 · 1~4: 답 선택 · F: 즐겨찾기</span>
         {current === questions.length - 1 || allAnswered ? (
           <button type="button" onClick={() => void finish()} className="text-blue-700 font-medium">
             종료

@@ -4,6 +4,7 @@ import type {
   GradeResult,
   PublicQuestion,
   SampleParams,
+  SelectedAnswer,
   SubmitAnswerItem,
   SubmitResult,
 } from "@/types/question";
@@ -16,6 +17,6 @@ export interface QuestionRepository {
   getTheoryMap(): Promise<TheoryMap>;
   getMetadata(): Promise<CertMetadata>;
   sampleQuestions(params: SampleParams): Promise<PublicQuestion[]>;
-  gradeQuestion(questionId: string, answer: number): Promise<GradeResult>;
+  gradeQuestion(questionId: string, answer: SelectedAnswer): Promise<GradeResult>;
   submitExam(answers: SubmitAnswerItem[]): Promise<SubmitResult>;
 }

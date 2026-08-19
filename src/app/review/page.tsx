@@ -11,7 +11,7 @@ import { getExamSessionWrongQuestionIds, listExamSessions } from "@/lib/latestEx
 import { getSubjectLabel } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
-import { ApiQuestionRepository } from "@/repositories/ApiQuestionRepository";
+import { ApiQuestionRepository, QuestionNotFoundError } from "@/repositories/ApiQuestionRepository";
 import type { QuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
@@ -43,13 +43,34 @@ const EMPTY_MESSAGE: Record<Tab, string> = {
   recent: "최근 푼 문제가 없다.",
 };
 
-async function hydrate(questionRepository: QuestionRepository, questionIds: string[]): Promise<PublicQuestion[]> {
+async function hydrate(
+  questionRepository: QuestionRepository,
+  questionIds: string[]
+): Promise<{ questions: PublicQuestion[]; notFoundIds: string[] }> {
   const results = await Promise.allSettled(
     questionIds.map((id) => questionRepository.getQuestion(id))
   );
-  return results
-    .filter((r): r is PromiseFulfilledResult<PublicQuestion> => r.status === "fulfilled")
-    .map((r) => r.value);
+  const questions: PublicQuestion[] = [];
+  const notFoundIds: string[] = [];
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") {
+      questions.push(r.value);
+    } else if (r.reason instanceof QuestionNotFoundError) {
+      // 데이터 개편 등으로 더 이상 존재하지 않는 문항이다 — 호출부가 오답노트/
+      // 즐겨찾기에서 정리할 수 있도록 알려준다(재조회할 때마다 반복 404 방지).
+      notFoundIds.push(questionIds[i]);
+    }
+  });
+  return { questions, notFoundIds };
+}
+
+async function pruneStaleIds(nextTab: Tab, notFoundIds: string[]): Promise<void> {
+  if (notFoundIds.length === 0) return;
+  if (nextTab === "wrong") {
+    await Promise.all(notFoundIds.map((id) => progressRepository.removeWrongNote(id)));
+  } else if (nextTab === "favorite") {
+    await Promise.all(notFoundIds.map((id) => progressRepository.removeFavorite(id)));
+  }
 }
 
 async function fetchTabQuestions(
@@ -100,7 +121,7 @@ async function fetchTabQuestions(
       }
     }
 
-    const questions = await hydrate(questionRepository, [...questionIds]);
+    const { questions } = await hydrate(questionRepository, [...questionIds]);
     questions.sort((a, b) => {
       const examA = tryParseQuestionId(a.questionId)?.examId ?? "";
       const examB = tryParseQuestionId(b.questionId)?.examId ?? "";
@@ -122,7 +143,8 @@ async function fetchTabQuestions(
     questionIds = getAllSolvedQuestionIds(attempts);
   }
 
-  const questions = await hydrate(questionRepository, questionIds);
+  const { questions, notFoundIds } = await hydrate(questionRepository, questionIds);
+  void pruneStaleIds(nextTab, notFoundIds);
   return { questions, wrongNotesById, modeById };
 }
 

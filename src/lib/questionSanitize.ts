@@ -3,7 +3,7 @@ import type { PublicQuestion, Question } from "@/types/question";
 export function toPublicQuestion(question: Question): PublicQuestion {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { answer, explanation, ...rest } = question;
-  return rest;
+  return { ...rest, answerCount: Array.isArray(answer) ? answer.length : 1 };
 }
 
 export function toPublicQuestions(questions: Question[]): PublicQuestion[] {

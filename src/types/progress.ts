@@ -1,3 +1,5 @@
+import type { SelectedAnswer } from "@/types/question";
+
 export type Mode = "exam" | "study";
 export type EntryType = "round" | "random";
 
@@ -7,7 +9,7 @@ export interface Attempt {
   solvedAt: number;
   mode: Mode;
   entryType: EntryType;
-  selectedAnswer: number;
+  selectedAnswer: SelectedAnswer;
   isCorrect: boolean;
   solveTimeMs: number;
   sessionId: string;

@@ -4,6 +4,7 @@ import type {
   GradeResult,
   PublicQuestion,
   SampleParams,
+  SelectedAnswer,
   SubmitAnswerItem,
   SubmitResult,
 } from "@/types/question";
@@ -14,6 +15,16 @@ export class ApiAccessError extends Error {
   constructor(message = "API access denied") {
     super(message);
     this.name = "ApiAccessError";
+  }
+}
+
+// 오답노트/즐겨찾기에 남은 questionId가 데이터 개편으로 더 이상 존재하지 않을 때
+// (examId 체계 변경 등) 구분해서 잡아야, 호출부가 "진짜 없음"과 네트워크 오류를
+// 구별해 자동으로 정리할 수 있다.
+export class QuestionNotFoundError extends Error {
+  constructor(message = "Question not found") {
+    super(message);
+    this.name = "QuestionNotFoundError";
   }
 }
 
@@ -29,6 +40,10 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
   if (res.status === 401) {
     throw new ApiAccessError();
+  }
+
+  if (res.status === 404) {
+    throw new QuestionNotFoundError();
   }
 
   if (!res.ok) {
@@ -131,7 +146,7 @@ export class ApiQuestionRepository implements QuestionRepository {
 
   async gradeQuestion(
       questionId: string,
-      answer: number
+      answer: SelectedAnswer
   ): Promise<GradeResult> {
     return apiFetch<GradeResult>(
         `/api/${this.certId}/questions/${encodeURIComponent(questionId)}/grade`,

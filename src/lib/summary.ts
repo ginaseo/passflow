@@ -1,4 +1,4 @@
-import type { PublicQuestion, SubmitResult } from "@/types/question";
+import type { PublicQuestion, SelectedAnswer, SubmitResult } from "@/types/question";
 
 export interface SessionSummary {
   total: number;
@@ -6,13 +6,13 @@ export interface SessionSummary {
   correct: number;
   wrong: number;
   questions: PublicQuestion[];
-  answers: Record<number, number>;
+  answers: Record<number, SelectedAnswer>;
   correctByIndex?: Record<number, boolean>;
 }
 
 export function summarizeSession(
   questions: PublicQuestion[],
-  answers: Record<number, number>,
+  answers: Record<number, SelectedAnswer>,
   correctByIndex?: Record<number, boolean>
 ): SessionSummary {
   const solvedIndices = Object.keys(answers).map(Number);
@@ -33,7 +33,7 @@ export function summarizeSession(
 
 export function summarizeFromSubmitResult(
   questions: PublicQuestion[],
-  answers: Record<number, number>,
+  answers: Record<number, SelectedAnswer>,
   submit: SubmitResult
 ): SessionSummary {
   const correctByIndex: Record<number, boolean> = {};
@@ -61,7 +61,7 @@ export interface SubjectScore {
 
 export function summarizeBySubject(
   questions: PublicQuestion[],
-  answers: Record<number, number>,
+  answers: Record<number, SelectedAnswer>,
   correctByIndex?: Record<number, boolean>
 ): SubjectScore[] {
   const bySubject = new Map<number, SubjectScore>();

@@ -1,6 +1,6 @@
 import { makeQuestionId, parseQuestionId } from "@/lib/questionId";
 import { toPublicQuestion } from "@/lib/questionSanitize";
-import type { CertMetadata, ExamSummary, GradeResult, PublicQuestion, SampleParams, SubmitAnswerItem, SubmitResult } from "@/types/question";
+import type { CertMetadata, ExamSummary, GradeResult, PublicQuestion, SampleParams, SelectedAnswer, SubmitAnswerItem, SubmitResult } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 import type { QuestionRepository } from "@/repositories/QuestionRepository";
 
@@ -36,7 +36,10 @@ export class JsonQuestionRepository implements QuestionRepository {
     let cached = this.examCache.get(examId);
     if (!cached) {
       cached = fetch(`/data/${this.certId}/exam_${examId}.json`)
-        .then((res) => res.json() as Promise<RawExam>)
+        .then((res) => {
+          if (!res.ok) throw new Error(`exam_${examId}.json 조회 실패: ${res.status}`);
+          return res.json() as Promise<RawExam>;
+        })
         .then((raw) =>
           raw.questions.map(
             (q): import("@/types/question").Question => ({
@@ -68,7 +71,10 @@ export class JsonQuestionRepository implements QuestionRepository {
   private loadIndex(): Promise<ExamSummary[]> {
     if (!this.indexCache) {
       this.indexCache = fetch(`/data/${this.certId}/exams_index.json`)
-        .then((res) => res.json() as Promise<ExamSummary[]>)
+        .then((res) => {
+          if (!res.ok) throw new Error(`exams_index.json 조회 실패: ${res.status}`);
+          return res.json() as Promise<ExamSummary[]>;
+        })
         .catch((err) => {
           this.indexCache = null;
           throw err;
@@ -80,7 +86,10 @@ export class JsonQuestionRepository implements QuestionRepository {
   async getTheoryMap(): Promise<TheoryMap> {
     if (!this.theoryMapCache) {
       this.theoryMapCache = fetch(`/data/${this.certId}/theory_map.json`)
-        .then((res) => res.json() as Promise<TheoryMap>)
+        .then((res) => {
+          if (!res.ok) throw new Error(`theory_map.json 조회 실패: ${res.status}`);
+          return res.json() as Promise<TheoryMap>;
+        })
         .catch((err) => {
           console.warn("Failed to load theory_map.json; continuing with an empty map.", err);
           this.theoryMapCache = Promise.resolve({});
@@ -96,23 +105,30 @@ export class JsonQuestionRepository implements QuestionRepository {
 
   async getMetadata(): Promise<CertMetadata> {
     if (!this.metadataCache) {
-      this.metadataCache = this.loadIndex().then(async (exams) => {
-        const all = await this.getQuestions({});
-        const subjectMap = new Map<number, { subjectName?: string; count: number }>();
-        for (const q of all) {
-          const prev = subjectMap.get(q.subject);
-          subjectMap.set(q.subject, {
-            subjectName: q.subjectName ?? prev?.subjectName,
-            count: (prev?.count ?? 0) + 1,
-          });
-        }
-        const subjects = [...subjectMap.entries()]
-          .map(([subject, { subjectName, count }]) => ({ subject, subjectName, count }))
-          .sort((a, b) => a.subject - b.subject);
-        const subjectCounts: Record<string, number> = { all: all.length };
-        for (const s of subjects) subjectCounts[String(s.subject)] = s.count;
-        return { exams, subjects, subjectCounts };
-      });
+      this.metadataCache = this.loadIndex()
+        .then(async (exams) => {
+          const all = await this.getQuestions({});
+          const subjectMap = new Map<number, { subjectName?: string; count: number }>();
+          for (const q of all) {
+            const prev = subjectMap.get(q.subject);
+            subjectMap.set(q.subject, {
+              subjectName: q.subjectName ?? prev?.subjectName,
+              count: (prev?.count ?? 0) + 1,
+            });
+          }
+          const subjects = [...subjectMap.entries()]
+            .map(([subject, { subjectName, count }]) => ({ subject, subjectName, count }))
+            .sort((a, b) => a.subject - b.subject);
+          const subjectCounts: Record<string, number> = { all: all.length };
+          for (const s of subjects) subjectCounts[String(s.subject)] = s.count;
+          return { exams, subjects, subjectCounts };
+        })
+        .catch((err) => {
+          // 실패한 프로미스를 캐시에 남기면 이후 모든 호출이 재시도 없이 같은
+          // 오류를 반환한다 — loadExam/loadIndex와 동일하게 실패 시 비운다.
+          this.metadataCache = null;
+          throw err;
+        });
     }
     return this.metadataCache;
   }
@@ -176,7 +192,7 @@ export class JsonQuestionRepository implements QuestionRepository {
     return picked;
   }
 
-  async gradeQuestion(questionId: string, answer: number): Promise<GradeResult> {
+  async gradeQuestion(questionId: string, answer: SelectedAnswer): Promise<GradeResult> {
     const { examId, qnum } = parseQuestionId(questionId);
     const questions = await this.loadExam(examId);
     const found = questions.find((q) => q.qnum === qnum);
