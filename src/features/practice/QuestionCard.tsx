@@ -63,7 +63,11 @@ const TABLE_HTML_CLASS =
     // 박스 안 표/이미지는 가운데 정렬한다 — 표(box-frame 바로 아래 table)는 mx-auto로,
     // 표 2개를 나란히 두는 flex wrapper(div)는 justify-center로 중앙에 모은다.
     // pre(SQL)는 코드라 왼쪽 정렬 유지.
-    "overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left [&_.box-frame]:border [&_.box-frame]:border-gray-400 [&_.box-frame]:rounded [&_.box-frame]:p-3 [&_.box-frame]:my-1 [&_.box-frame_table]:mb-3 [&_.box-frame>table]:mx-auto [&_.box-frame>div]:justify-center [&_.box-frame_pre]:whitespace-pre-wrap [&_.box-frame_pre]:text-sm";
+    "overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:px-3 [&_td]:px-3 [&_th]:py-1.5 [&_td]:py-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_th]:text-left [&_td]:text-left [&_.box-frame]:border [&_.box-frame]:border-gray-400 [&_.box-frame]:rounded [&_.box-frame]:p-3 [&_.box-frame]:my-1 [&_.box-frame_table]:mb-3 [&_.box-frame>table]:mx-auto [&_.box-frame>div]:justify-center [&_.box-frame_pre]:whitespace-pre-wrap [&_.box-frame_pre]:text-sm " +
+    // 엔터티 속성 목록(예: [수강지도])처럼 한 줄에 칸이 하나뿐인 표는 칸마다 테두리를
+    // 두르면(기본 표 스타일) PDF의 "테두리 하나 + 필요한 곳만 구분선" 박스와 다르게
+    // 칸칸이 다 나뉘어 보인다 — 이런 표만 셀 테두리를 없애고 줄 사이 구분선만 남긴다.
+    "[&_table:has(td:only-child)]:border [&_table:has(td:only-child)]:border-gray-300 [&_table:has(td:only-child)_td]:border-0 [&_table:has(td:only-child)_td]:border-b [&_table:has(td:only-child)_td]:border-gray-300 [&_table:has(td:only-child)_tr:last-child_td]:border-b-0";
 
 function formatPlaceholderText(text: string): string {
   return text
