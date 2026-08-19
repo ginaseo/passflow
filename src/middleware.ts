@@ -14,6 +14,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (!isAccessKeyConfigured()) {
+    // 로컬 개발 편의를 위해 키 미설정 시 인증을 건너뛴다 — 다만 운영 배포에서
+    // PASSFLOW_ACCESS_KEY 설정을 빠뜨리면 채점 API가 정답/해설을 인증 없이
+    // 노출하게 되므로, production에서는 fail-open 대신 막는다.
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+    }
     return NextResponse.next();
   }
 

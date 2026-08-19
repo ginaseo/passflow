@@ -189,6 +189,14 @@ export function PracticeSession({
         }
       } catch (err) {
         console.error("gradeQuestion failed:", err);
+        // 채점 실패 — 저장해둔 선택을 되돌린다. 안 그러면 currentSet.length > 0라
+        // 다음 클릭이 전부 무시되어(위쪽 requiredCount===1 분기) 문항이 영구히
+        // 잠긴 것처럼 보인다.
+        setAnswers((prev) => {
+          const next = { ...prev };
+          delete next[current];
+          return next;
+        });
       }
     } else {
       trackWrite(
@@ -219,7 +227,7 @@ export function PracticeSession({
     trackWrite(action.catch((err) => console.error("toggleFavorite failed:", err)));
   }
 
-  const submitExam = useCallback(async (): Promise<void> => {
+  const submitExam = useCallback(async (): Promise<boolean> => {
     const items = Object.entries(answers).map(([indexStr, selectedAnswer]) => ({
       questionId: questions[Number(indexStr)].questionId,
       selectedAnswer,
@@ -260,8 +268,10 @@ export function PracticeSession({
       }
 
       onFinish(summarizeFromSubmitResult(questions, answers, submit));
+      return true;
     } catch (err) {
       console.error("submitExam failed:", err);
+      return false;
     }
   }, [answers, onFinish, questions, questionRepository, entryType, mode, sessionId, sessionStartedAt, timeLimitMs]);
 
@@ -270,7 +280,13 @@ export function PracticeSession({
     finishedRef.current = true;
 
     if (mode === "exam") {
-      await submitExam();
+      const submitted = await submitExam();
+      if (!submitted) {
+        // 제출 실패 — finishedRef를 되돌려 "종료" 버튼/시간만료로 재시도할 수 있게
+        // 한다. onFinish를 안 불렀으니 결과 화면으로도 안 넘어간다.
+        finishedRef.current = false;
+        return;
+      }
     } else {
       const correctByIndex: Record<number, boolean> = {};
       for (const [indexStr, fb] of Object.entries(feedbackByIndex)) {

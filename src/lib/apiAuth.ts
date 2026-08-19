@@ -1,4 +1,7 @@
 export const ACCESS_COOKIE = "pf_access";
+// 쿠키 발급 후 이 기간이 지나면 서명은 유효해도 거부한다 — 서명 자체엔 만료가
+// 없어서 검증 안 하면 유출된 쿠키가 access key를 바꾸기 전까진 영원히 통과한다.
+const ACCESS_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 function getAccessKey(): string | undefined {
   return process.env.PASSFLOW_ACCESS_KEY;
@@ -47,7 +50,14 @@ export async function verifyAccessCookieValue(value: string | undefined): Promis
   const issuedAt = value.slice(0, dot);
   const signature = value.slice(dot + 1);
   const expected = await hmacSha256Hex(secret, issuedAt);
-  return timingSafeEqual(signature, expected);
+  if (!timingSafeEqual(signature, expected)) return false;
+
+  const issuedAtMs = Number(issuedAt);
+  if (!Number.isInteger(issuedAtMs)) return false;
+  const ageMs = Date.now() - issuedAtMs;
+  if (ageMs < 0 || ageMs > ACCESS_COOKIE_MAX_AGE_SECONDS * 1000) return false;
+
+  return true;
 }
 
 export function verifyUnlockKey(key: string): boolean {
@@ -56,7 +66,7 @@ export function verifyUnlockKey(key: string): boolean {
   return timingSafeEqual(key, secret);
 }
 
-export function accessCookieOptions(maxAgeSeconds = 60 * 60 * 24 * 7) {
+export function accessCookieOptions(maxAgeSeconds = ACCESS_COOKIE_MAX_AGE_SECONDS) {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
