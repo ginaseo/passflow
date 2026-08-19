@@ -1,21 +1,24 @@
-import { gradeAnswer } from "./grading";
-import type { Question } from "@/types/question";
+import type { PublicQuestion, SelectedAnswer, SubmitResult } from "@/types/question";
 
 export interface SessionSummary {
   total: number;
   solved: number;
   correct: number;
   wrong: number;
-  questions: Question[];
-  answers: Record<number, number>;
+  questions: PublicQuestion[];
+  answers: Record<number, SelectedAnswer>;
+  correctByIndex?: Record<number, boolean>;
 }
 
 export function summarizeSession(
-  questions: Question[],
-  answers: Record<number, number>
+  questions: PublicQuestion[],
+  answers: Record<number, SelectedAnswer>,
+  correctByIndex?: Record<number, boolean>
 ): SessionSummary {
   const solvedIndices = Object.keys(answers).map(Number);
-  const correct = solvedIndices.filter((i) => gradeAnswer(questions[i], answers[i])).length;
+  const correct = correctByIndex
+    ? solvedIndices.filter((i) => correctByIndex[i]).length
+    : 0;
 
   return {
     total: questions.length,
@@ -24,6 +27,28 @@ export function summarizeSession(
     wrong: solvedIndices.length - correct,
     questions,
     answers,
+    correctByIndex,
+  };
+}
+
+export function summarizeFromSubmitResult(
+  questions: PublicQuestion[],
+  answers: Record<number, SelectedAnswer>,
+  submit: SubmitResult
+): SessionSummary {
+  const correctByIndex: Record<number, boolean> = {};
+  for (const result of submit.results) {
+    const index = questions.findIndex((q) => q.questionId === result.questionId);
+    if (index >= 0) correctByIndex[index] = result.correct;
+  }
+  return {
+    total: questions.length,
+    solved: submit.solved,
+    correct: submit.correct,
+    wrong: submit.wrong,
+    questions,
+    answers,
+    correctByIndex,
   };
 }
 
@@ -35,8 +60,9 @@ export interface SubjectScore {
 }
 
 export function summarizeBySubject(
-  questions: Question[],
-  answers: Record<number, number>
+  questions: PublicQuestion[],
+  answers: Record<number, SelectedAnswer>,
+  correctByIndex?: Record<number, boolean>
 ): SubjectScore[] {
   const bySubject = new Map<number, SubjectScore>();
 
@@ -48,7 +74,7 @@ export function summarizeBySubject(
       correct: 0,
     };
     score.total += 1;
-    if (i in answers && gradeAnswer(question, answers[i])) {
+    if (i in answers && correctByIndex?.[i]) {
       score.correct += 1;
     }
     bySubject.set(question.subject, score);

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "data": "node --env-file-if-exists=.env.local scripts/copy-data.mjs",
+    "fetch-data": "node --env-file-if-exists=.env.local scripts/fetch-data.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

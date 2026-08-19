@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
-import { JsonQuestionRepository } from "@/repositories/QuestionRepository";
+import { ApiQuestionRepository } from "@/repositories/ApiQuestionRepository";
 import { listExamSessions, scoreExamSession } from "@/lib/latestExamResult";
 import { getSelectedCertId } from "@/lib/cert";
 import { computeDashboardSummary, scopeAttemptsToExams } from "@/lib/dashboardSummary";
@@ -81,7 +81,7 @@ function CbtCard({ result: r }: { result: CbtResult }) {
 }
 
 export default function DashboardPage() {
-  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
+  const questionRepository = useMemo(() => new ApiQuestionRepository(getSelectedCertId()), []);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState(false);
   const [cbtResults, setCbtResults] = useState<CbtResult[] | null>(null);
@@ -96,12 +96,24 @@ export default function DashboardPage() {
         setSummary(computeDashboardSummary(scopeAttemptsToExams(attempts, exams)));
 
         const sessions = listExamSessions(attempts);
+        // 같은 회차를 여러 번 응시(재도전)했으면 세션마다 examId가 겹친다 — 세션
+        // 개수만큼이 아니라 서로 다른 examId 개수만큼만 문항을 fetch한다.
+        const questionsByExamId = new Map<string, ReturnType<typeof questionRepository.getQuestions>>();
+        function loadExamQuestions(examId: string) {
+          let promise = questionsByExamId.get(examId);
+          if (!promise) {
+            promise = questionRepository.getQuestions({ examId });
+            questionsByExamId.set(examId, promise);
+          }
+          return promise;
+        }
+
         const results = await Promise.all(
           sessions.map(async ({ examId, sessionId, solvedAt }) => {
             try {
               const exam = exams.find((e) => e.examId === examId);
               if (!exam) return null;
-              const questions = await questionRepository.getQuestions({ examId });
+              const questions = await loadExamQuestions(examId);
               const score = scoreExamSession(questions, attempts, examId, sessionId);
               return { sessionId, examId, title: exam.title, solvedAt, ...score };
             } catch (err) {

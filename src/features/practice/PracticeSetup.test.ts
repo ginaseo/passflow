@@ -25,16 +25,16 @@ describe("getOrderedVisibleExams", () => {
     expect(result.map((e) => e.examId)).toEqual(["SQLD-50", "SQLD-49", "SQLD-48"]);
   });
 
-  it("sqld는 노랭이(주제별 원본 문제집, SQLD-N-N)를 맨 아래로 보낸다", () => {
+  it("sqld는 기출복원 회차만 남기고 노랭이 등은 회차별 목록에서 제외한다", () => {
     const exams = [exam("SQLD-1-1"), exam("SQLD-49"), exam("SQLD-2-1"), exam("SQLD-48")];
     const result = getOrderedVisibleExams(exams, "sqld");
-    expect(result.map((e) => e.examId)).toEqual(["SQLD-49", "SQLD-48", "SQLD-1-1", "SQLD-2-1"]);
+    expect(result.map((e) => e.examId)).toEqual(["SQLD-49", "SQLD-48"]);
   });
 
-  it("sqld는 회차도 노랭이도 아닌 항목을 rest로 두어 회차 다음·노랭이 이전에 원래 상대 순서대로 배치한다", () => {
+  it("sqld는 기출복원 회차만 남기고 기타 examId는 회차별 목록에서 제외한다", () => {
     const exams = [exam("SQLD-etc-b"), exam("SQLD-49"), exam("SQLD-1-1"), exam("SQLD-etc-a")];
     const result = getOrderedVisibleExams(exams, "sqld");
-    expect(result.map((e) => e.examId)).toEqual(["SQLD-49", "SQLD-etc-b", "SQLD-etc-a", "SQLD-1-1"]);
+    expect(result.map((e) => e.examId)).toEqual(["SQLD-49"]);
   });
 
   it("sqld는 원본 배열을 변경하지 않는다", () => {
@@ -55,9 +55,9 @@ describe("getOrderedVisibleExams", () => {
     expect(getOrderedVisibleExams([], "unknown")).toEqual([]);
   });
 
-  it("sqld 목록이 노랭이만으로 이루어져 있으면 그대로 노랭이만 남는다", () => {
+  it("sqld 목록이 노랭이만이면 회차별 목록은 비어 있다", () => {
     const exams = [exam("SQLD-2-1"), exam("SQLD-1-1")];
     const result = getOrderedVisibleExams(exams, "sqld");
-    expect(result.map((e) => e.examId)).toEqual(["SQLD-2-1", "SQLD-1-1"]);
+    expect(result.map((e) => e.examId)).toEqual([]);
   });
 });

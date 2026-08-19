@@ -65,6 +65,11 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+// 2개 이상 고르는 문항의 attempt는 selectedAnswer가 number[]로 저장된다.
+function isValidSelectedAnswer(value: unknown): value is number | number[] {
+  return isFiniteNumber(value) || (Array.isArray(value) && value.length > 0 && value.every(isFiniteNumber));
+}
+
 // id는 절대 복사하지 않는다 — IndexedDB의 attempts 스토어는 autoIncrement 키라서,
 // 백업 파일에 남아있는(또는 사용자가 손으로 넣은) id가 기존 레코드와 충돌하면
 // importBackup의 트랜잭션 전체가 abort된다.
@@ -85,7 +90,7 @@ function normalizeAttempt(value: unknown): Omit<Attempt, "id"> | null {
     typeof a.questionId !== "string" ||
     !isFiniteNumber(a.solvedAt) ||
     (a.mode !== "study" && a.mode !== "exam") ||
-    !isFiniteNumber(a.selectedAnswer) ||
+    !isValidSelectedAnswer(a.selectedAnswer) ||
     typeof a.isCorrect !== "boolean" ||
     !isFiniteNumber(a.solveTimeMs) ||
     typeof a.sessionId !== "string" ||

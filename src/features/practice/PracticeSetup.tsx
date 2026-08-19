@@ -116,29 +116,21 @@ export function PracticeSetup({
     // 과목 버튼 목록만을 위해 전체 문항을 내려받는다 — 회차 목록·상태 표시는 위
     // 요청과 분리해서 이걸 기다리지 않고 먼저 뜨게 한다(전체 문항 fetch는 자격증
     // 회차가 많을수록 오래 걸릴 수 있다). 여기서 채운 캐시는 "시작" 시 재사용된다.
-    questionRepository.getQuestions({}).then(
-      (allQuestions) => {
+    questionRepository.getMetadata().then(
+      (metadata) => {
         if (cancelled) return;
-        const subjectList = [...new Map(allQuestions.map((q) => [q.subject, q.subjectName] as const)).entries()]
-          .map(([subject, subjectName]) => ({ subject, subjectName }))
-          .sort((a, b) => a.subject - b.subject);
-        setSubjects(subjectList);
-        // URL(예: 오래된 북마크)로 들어온 초기 과목값이 이 자격증엔 없는 과목번호일
-        // 수 있다 — 그 경우 빈 문항 목록으로 조용히 실패하는 대신 "통합"으로 되돌린다.
-        setSubject((prev) => (prev === "all" || subjectList.some((s) => s.subject === prev) ? prev : "all"));
+        setSubjects(metadata.subjects);
+        setSubject((prev) =>
+          prev === "all" || metadata.subjects.some((s) => s.subject === prev) ? prev : "all"
+        );
 
-        // 문항수 "전체" 선택 시 제한시간 자동계산에 실제 문항수를 쓰기 위해 세어둔다.
-        const counts = new Map<number | "all", number>([["all", allQuestions.length]]);
-        for (const q of allQuestions) counts.set(q.subject, (counts.get(q.subject) ?? 0) + 1);
+        const counts = new Map<number | "all", number>([["all", metadata.subjectCounts.all ?? 0]]);
+        for (const s of metadata.subjects) counts.set(s.subject, s.count);
         setSubjectCounts(counts);
         setQuestionsLoaded(true);
       },
       (err) => {
         if (cancelled) return;
-        // questionsLoaded를 켜지 않는다 — 실패한 채로 켜면 subjectCounts가 빈
-        // 상태로 "로딩 끝남" 취급돼 제한시간 자동계산이 0으로 나와 시작하자마자
-        // 자동제출되는 문제로 이어진다(회차별이 examId를 계속 null로 둬 시작을
-        // 막는 것과 동일하게, 여기서도 계산할 수 있을 때까지 시작을 막아둔다).
         console.error("과목 목록을 불러오지 못했다:", err);
       }
     );

@@ -1,10 +1,10 @@
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 
-export function pickRandomQuestions(
-  questions: Question[],
+export function pickRandomQuestions<T extends PublicQuestion>(
+  questions: T[],
   count: number,
   rng: () => number = Math.random
-): Question[] {
+): T[] {
   const pool = [...questions];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -16,18 +16,18 @@ export function pickRandomQuestions(
 // 랜덤 진입에서 "순차" 순서를 고른 경우 사용 — 셔플하지 않고 examId, qnum
 // 순으로 정렬해 앞에서부터 count개를 취한다. 여러 회차가 섞인 풀에서도 한
 // 회차씩 순서대로 지나가도록 examId를 먼저 기준으로 둔다.
-export function pickSequentialQuestions(questions: Question[], count: number): Question[] {
+export function pickSequentialQuestions<T extends PublicQuestion>(questions: T[], count: number): T[] {
   const sorted = [...questions].sort((a, b) => a.examId.localeCompare(b.examId) || a.qnum - b.qnum);
   return sorted.slice(0, Math.min(count, sorted.length));
 }
 
-export function pickStratifiedRandomQuestions(
-  questions: Question[],
+export function pickStratifiedRandomQuestions<T extends PublicQuestion>(
+  questions: T[],
   count: number,
   rng: () => number = Math.random,
   weights?: Record<number, number>
-): Question[] {
-  const bySubject = new Map<number, Question[]>();
+): T[] {
+  const bySubject = new Map<number, T[]>();
   for (const q of questions) {
     const list = bySubject.get(q.subject) ?? [];
     list.push(q);
@@ -95,7 +95,7 @@ export function pickStratifiedRandomQuestions(
     if (!distributed) break; // 전체 풀이 count보다 작으면 더 나눠줄 데가 없다
   }
 
-  const picked: Question[] = [];
+  const picked: T[] = [];
   for (const subject of subjects) {
     picked.push(...pickRandomQuestions(bySubject.get(subject)!, quota.get(subject)!, rng));
   }

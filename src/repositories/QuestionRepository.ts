@@ -1,123 +1,26 @@
-import { makeQuestionId, parseQuestionId } from "@/lib/questionId";
-import type { ExamSummary, Question } from "@/types/question";
+import type {
+  CertMetadata,
+  ExamSummary,
+  GradeResult,
+  PublicQuestion,
+  SampleParams,
+  SelectedAnswer,
+  SubmitAnswerItem,
+  SubmitResult,
+} from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 export interface QuestionRepository {
-  getQuestion(questionId: string): Promise<Question>;
-  getQuestions(filter: { examId?: string; subject?: number }): Promise<Question[]>;
+  getQuestion(questionId: string): Promise<PublicQuestion>;
+  getQuestions(filter: { examId?: string; subject?: number; examIds?: string[] }): Promise<PublicQuestion[]>;
+  // 서로 다른 examId에 흩어진 questionId를 한 번에 조회한다(오답노트/즐겨찾기처럼
+  // ID가 뒤섞인 목록을 하나씩 fetch하는 N+1을 피하기 위한 배치 조회). 존재하지
+  // 않는 ID는 결과에서 조용히 빠진다 — 호출부가 요청 목록과의 diff로 감지한다.
+  getQuestionsByIds(questionIds: string[]): Promise<PublicQuestion[]>;
   getExamIndex(): Promise<ExamSummary[]>;
   getTheoryMap(): Promise<TheoryMap>;
-}
-
-interface RawQuestion {
-  qnum: number;
-  stem: string;
-  options: string[];
-  subject: number;
-  subjectName?: string;
-  answer: number | number[];
-  explanation: string;
-  image: string | null;
-  sinagong?: string;
-  table?: string;
-  verified?: boolean;
-}
-
-interface RawExam {
-  examId: string;
-  title: string;
-  questions: RawQuestion[];
-}
-
-export class JsonQuestionRepository implements QuestionRepository {
-  private examCache = new Map<string, Promise<Question[]>>();
-  private indexCache: Promise<ExamSummary[]> | null = null;
-  private theoryMapCache: Promise<TheoryMap> | null = null;
-
-  constructor(private readonly certId: string) {}
-
-  private loadExam(examId: string): Promise<Question[]> {
-    let cached = this.examCache.get(examId);
-    if (!cached) {
-      cached = fetch(`/data/${this.certId}/exam_${examId}.json`)
-        .then((res) => res.json() as Promise<RawExam>)
-        .then((raw) =>
-          raw.questions.map(
-            (q): Question => ({
-              questionId: makeQuestionId(this.certId, raw.examId, q.qnum),
-              examId: raw.examId,
-              qnum: q.qnum,
-              stem: q.stem,
-              options: q.options,
-              subject: q.subject,
-              subjectName: q.subjectName,
-              answer: q.answer,
-              explanation: q.explanation,
-              image: q.image ? `${this.certId}/${q.image}` : null,
-              sinagong: q.sinagong,
-              table: q.table,
-              verified: q.verified,
-            })
-          )
-        )
-        .catch((err) => {
-          this.examCache.delete(examId);
-          throw err;
-        });
-      this.examCache.set(examId, cached);
-    }
-    return cached;
-  }
-
-  private loadIndex(): Promise<ExamSummary[]> {
-    if (!this.indexCache) {
-      this.indexCache = fetch(`/data/${this.certId}/exams_index.json`)
-        .then((res) => res.json() as Promise<ExamSummary[]>)
-        .catch((err) => {
-          this.indexCache = null;
-          throw err;
-        });
-    }
-    return this.indexCache;
-  }
-
-  async getTheoryMap(): Promise<TheoryMap> {
-    if (!this.theoryMapCache) {
-      this.theoryMapCache = fetch(`/data/${this.certId}/theory_map.json`)
-        .then((res) => res.json() as Promise<TheoryMap>)
-        .catch((err) => {
-          console.warn("Failed to load theory_map.json; continuing with an empty map.", err);
-          this.theoryMapCache = Promise.resolve({});
-          return {};
-        });
-    }
-    return this.theoryMapCache;
-  }
-
-  async getExamIndex(): Promise<ExamSummary[]> {
-    return this.loadIndex();
-  }
-
-  async getQuestion(questionId: string): Promise<Question> {
-    const { examId, qnum } = parseQuestionId(questionId);
-    const questions = await this.loadExam(examId);
-    const found = questions.find((q) => q.qnum === qnum);
-    if (!found) {
-      throw new Error(`문항을 찾을 수 없다: ${questionId}`);
-    }
-    return found;
-  }
-
-  async getQuestions(filter: { examId?: string; subject?: number }): Promise<Question[]> {
-    const examIds = filter.examId
-      ? [filter.examId]
-      : (await this.loadIndex()).map((e) => e.examId);
-
-    const perExam = await Promise.all(examIds.map((id) => this.loadExam(id)));
-    const all = perExam.flat();
-
-    return filter.subject === undefined
-      ? all
-      : all.filter((q) => q.subject === filter.subject);
-  }
+  getMetadata(): Promise<CertMetadata>;
+  sampleQuestions(params: SampleParams): Promise<PublicQuestion[]>;
+  gradeQuestion(questionId: string, answer: SelectedAnswer): Promise<GradeResult>;
+  submitExam(answers: SubmitAnswerItem[]): Promise<SubmitResult>;
 }

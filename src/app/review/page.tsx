@@ -11,12 +11,13 @@ import { getExamSessionWrongQuestionIds, listExamSessions } from "@/lib/latestEx
 import { getSubjectLabel } from "@/lib/theory";
 import type { Mode, WrongNote } from "@/types/progress";
 import type { SessionSummary } from "@/lib/summary";
-import { JsonQuestionRepository, type QuestionRepository } from "@/repositories/QuestionRepository";
+import { ApiQuestionRepository } from "@/repositories/ApiQuestionRepository";
+import type { QuestionRepository } from "@/repositories/QuestionRepository";
 import { IndexedDbProgressRepository } from "@/repositories/ProgressRepository";
 import { IndexedDbSettingsRepository } from "@/repositories/SettingsRepository";
 import { getSelectedCertId } from "@/lib/cert";
 import { DEFAULT_SETTINGS } from "@/types/settings";
-import type { Question } from "@/types/question";
+import type { PublicQuestion } from "@/types/question";
 import type { TheoryMap } from "@/types/theory";
 
 const progressRepository = new IndexedDbProgressRepository();
@@ -26,7 +27,7 @@ type Tab = "wrong" | "favorite" | "recent";
 
 type Phase =
   | { kind: "list" }
-  | { kind: "active"; questions: Question[]; theoryMap: TheoryMap; autoSaveWrongNotes: boolean }
+  | { kind: "active"; questions: PublicQuestion[]; theoryMap: TheoryMap; autoSaveWrongNotes: boolean }
   | { kind: "done"; summary: SessionSummary }
   | { kind: "error"; message: string };
 
@@ -42,13 +43,37 @@ const EMPTY_MESSAGE: Record<Tab, string> = {
   recent: "최근 푼 문제가 없다.",
 };
 
-async function hydrate(questionRepository: QuestionRepository, questionIds: string[]): Promise<Question[]> {
-  const results = await Promise.allSettled(
-    questionIds.map((id) => questionRepository.getQuestion(id))
-  );
-  return results
-    .filter((r): r is PromiseFulfilledResult<Question> => r.status === "fulfilled")
-    .map((r) => r.value);
+async function hydrate(
+  questionRepository: QuestionRepository,
+  questionIds: string[]
+): Promise<{ questions: PublicQuestion[]; notFoundIds: string[] }> {
+  if (questionIds.length === 0) return { questions: [], notFoundIds: [] };
+
+  // 문항 하나하나 개별 fetch하면 오답노트/즐겨찾기가 쌓일수록 요청 수가 N개로
+  // 불어난다 — questionId를 한 번에 배치 조회한다. 배치 응답은 examId별로 묶여
+  // 나오므로, 화면에 보여줄 순서(최근 추가순 등)를 지키려면 questionIds 순서
+  // 그대로 재정렬해야 한다.
+  const fetched = await questionRepository.getQuestionsByIds(questionIds);
+  const byId = new Map(fetched.map((q) => [q.questionId, q]));
+  const questions: PublicQuestion[] = [];
+  const notFoundIds: string[] = [];
+  for (const id of questionIds) {
+    const q = byId.get(id);
+    if (q) questions.push(q);
+    // 데이터 개편 등으로 더 이상 존재하지 않는 문항이다 — 호출부가 오답노트/
+    // 즐겨찾기에서 정리할 수 있도록 알려준다(재조회할 때마다 반복 404 방지).
+    else notFoundIds.push(id);
+  }
+  return { questions, notFoundIds };
+}
+
+async function pruneStaleIds(nextTab: Tab, notFoundIds: string[]): Promise<void> {
+  if (notFoundIds.length === 0) return;
+  if (nextTab === "wrong") {
+    await Promise.all(notFoundIds.map((id) => progressRepository.removeWrongNote(id)));
+  } else if (nextTab === "favorite") {
+    await Promise.all(notFoundIds.map((id) => progressRepository.removeFavorite(id)));
+  }
 }
 
 async function fetchTabQuestions(
@@ -57,7 +82,7 @@ async function fetchTabQuestions(
   modeFilter: "all" | "study" | "exam",
   roundFilter: string,
   sessionIdFilter: string | null
-): Promise<{ questions: Question[]; wrongNotesById: Map<string, WrongNote>; modeById: Map<string, Mode> }> {
+): Promise<{ questions: PublicQuestion[]; wrongNotesById: Map<string, WrongNote>; modeById: Map<string, Mode> }> {
   let questionIds: string[];
   let wrongNotesById = new Map<string, WrongNote>();
 
@@ -99,7 +124,7 @@ async function fetchTabQuestions(
       }
     }
 
-    const questions = await hydrate(questionRepository, [...questionIds]);
+    const { questions } = await hydrate(questionRepository, [...questionIds]);
     questions.sort((a, b) => {
       const examA = tryParseQuestionId(a.questionId)?.examId ?? "";
       const examB = tryParseQuestionId(b.questionId)?.examId ?? "";
@@ -121,15 +146,16 @@ async function fetchTabQuestions(
     questionIds = getAllSolvedQuestionIds(attempts);
   }
 
-  const questions = await hydrate(questionRepository, questionIds);
+  const { questions, notFoundIds } = await hydrate(questionRepository, questionIds);
+  void pruneStaleIds(nextTab, notFoundIds);
   return { questions, wrongNotesById, modeById };
 }
 
 function ReviewContent() {
-  const questionRepository = useMemo(() => new JsonQuestionRepository(getSelectedCertId()), []);
+  const questionRepository = useMemo(() => new ApiQuestionRepository(getSelectedCertId()), []);
   const [tab, setTab] = useState<Tab>("wrong");
   const [phase, setPhase] = useState<Phase>({ kind: "list" });
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<PublicQuestion[]>([]);
   const [wrongNotesById, setWrongNotesById] = useState<Map<string, WrongNote>>(new Map());
   const [modeById, setModeById] = useState<Map<string, Mode>>(new Map());
   const searchParams = useSearchParams();
@@ -250,7 +276,7 @@ function ReviewContent() {
     setQuestions((prev) => prev.filter((q) => q.questionId !== questionId));
   }
 
-  async function handleRetry(selectedQuestions: Question[]) {
+  async function handleRetry(selectedQuestions: PublicQuestion[]) {
     if (selectedQuestions.length === 0) return;
     try {
       const [theoryMap, settings] = await Promise.all([
@@ -312,6 +338,7 @@ function ReviewContent() {
   if (phase.kind === "active") {
     return (
       <PracticeSession
+        questionRepository={questionRepository}
         questions={phase.questions}
         theoryMap={phase.theoryMap}
         mode="study"

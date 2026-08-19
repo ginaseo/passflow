@@ -4,15 +4,14 @@
 
 ## 상태
 
-**v1(MVP) 완성.** 백엔드 없이 동작한다 — 문제는 자격증별 정적 JSON으로 읽고, 풀이 기록·설정·오답노트는 브라우저 IndexedDB(불가 시 localStorage 폴백)에 쌓는다. 개인 학습 도구로는 이 상태로 완결.
+**v2 — Private API + 서버 배포.** 문제 데이터는 서버에서만 읽고, API를 통해 정답 없이 전달한다. 채점은 서버에서 수행한다. 풀이 기록·설정·오답노트는 브라우저 IndexedDB(불가 시 localStorage 폴백)에 쌓는다.
 
 - **자격증 선택**: 설정에서 자격증 전환(정처기/SQLD), 자격증별로 문제·진행기록 분리
-- **문제풀이**: 학습모드(즉시채점) · 시험모드(회차 전체 응시, 자격증별 실제 시험 비율로 제한시간 자동계산 또는 제한없음, 과락/합격 판정). 랜덤 진입 시 자격증별 실제 과목 비율로 배분추출.
+- **문제풀이**: 학습모드(즉시채점) · 시험모드(회차 전체 응시, 자격증별 실제 시험 비율로 제한시간 자동계산 또는 제한없음, 과락/합격 판정). 랜덤 진입 시 서버에서 과목 비율 배분 추출.
 - **복습**: 오답노트 · 즐겨찾기 · 최근 푼 문제, 다시풀기(순차/랜덤 설정 가능)
 - **대시보드**: 오늘/전체 통계, CBT 응시 기록 전체(회차별 과목 점수·응시일시·미완료 세션 표시)
 - **설정**: 오답 자동저장, 기본 모드, 시간초과 처리, 데이터 백업 내보내기/가져오기, 전체 초기화
-
-여러 사용자가 실제로 쓰게 배포하려면(v2), 문제은행을 클라이언트에 통째로 내려보내는 지금 구조로는 노출을 막을 수 없다 — 문제를 한 번에 하나씩만 서버가 내려주고 채점도 서버에서 하는 백엔드가 필요하다. 지금은 이 상태로 개인용/로컬로만 쓴다.
+- **접근 제어**: shared secret (접근 키)로 API 보호
 
 ## 스택
 
@@ -22,30 +21,55 @@ Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS 4 · PWA
 
 ```bash
 npm install
+```
+
+`.env.local` 예시:
+
+```env
+PASSFLOW_DATA_DIR=C:/CompWork/passflow-data/data
+PASSFLOW_ACCESS_KEY=로컬테스트용비밀번호
+```
+
+```bash
 npm run dev
 ```
 
-http://localhost:3000
+http://localhost:3000 — 첫 접속 시 접근 키 입력.
 
 ## 문제 데이터
 
-문제 JSON은 이 repo에 없다(`/public/data/`는 gitignore 대상). `.env.local`에 `PASSFLOW_DATA_DIR`로 원본 디렉토리를 지정하고 아래를 실행하면 복사된다:
+문제 JSON은 Private repo `passflow-data`에 있다. 서버는 `PASSFLOW_DATA_DIR`에서 직접 읽는다.
 
-```bash
-npm run data
-```
+로컬: `passflow-data`를 clone하고 `PASSFLOW_DATA_DIR`을 `data/` 하위로 지정.
+
+배포(Render): build 시 `scripts/fetch-data.mjs`가 private repo를 clone한다. `PASSFLOW_DATA_TOKEN` 필요.
+
+레거시 `npm run data` (`public/data/` 복사)는 v2에서 사용하지 않는다.
 
 ## 구조
 
-```
-src/app/          라우트 (App Router) — /, /practice, /review, /dashboard, /settings
+```text
+src/app/          라우트 + API Route Handlers
 src/features/     기능 단위 폴더 (layout, nav, practice, review)
-src/lib/          비즈니스 로직 — 순수 함수, UI·저장소에 의존하지 않는다
-src/repositories/ 데이터 접근 (JSON + IndexedDB, localStorage 폴백)
-scripts/          개발용 스크립트
+src/lib/          비즈니스 로직 — 순수 함수
+src/repositories/ ApiQuestionRepository (client) + FsQuestionRepository (server) + IndexedDB
+scripts/          fetch-data.mjs (배포), copy-data.mjs (레거시)
 ```
 
-UI는 표시만 하고, 로직은 `src/lib`에, 데이터 접근은 Repository 인터페이스 뒤에 둔다. v2에서 JSON을 API로 바꿀 때 구현체만 교체하고 UI는 건드리지 않기 위한 경계다.
+## Render 배포
+
+Build: `npm ci && node scripts/fetch-data.mjs && npm run build`
+
+Start: `npm run start`
+
+Environment Variables:
+
+| 변수 | 설명 |
+|------|------|
+| `PASSFLOW_DATA_TOKEN` | GitHub PAT (passflow-data Contents: Read) |
+| `PASSFLOW_DATA_REPO` | `https://github.com/ginaseo/passflow-data.git` |
+| `PASSFLOW_DATA_DIR` | `.passflow-data/data` |
+| `PASSFLOW_ACCESS_KEY` | 접근 키 (shared secret) |
 
 ## 스크립트
 
@@ -56,4 +80,5 @@ UI는 표시만 하고, 로직은 `src/lib`에, 데이터 접근은 Repository �
 | `npm run start` | 빌드 결과 실행 |
 | `npm run lint` | ESLint |
 | `npm run test` | Vitest 테스트 |
-| `npm run data` | 문제 데이터 동기화 (`PASSFLOW_DATA_DIR` → `public/data/`) |
+| `npm run fetch-data` | Private repo clone (배포/로컬) |
+| `npm run data` | 레거시 — public/data 복사 (v1) |
