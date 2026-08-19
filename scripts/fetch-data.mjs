@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import {
   cpSync,
   copyFileSync,
@@ -94,13 +94,19 @@ function cloneRepo() {
   rmSync(CLONE_DIR, { recursive: true, force: true });
   mkdirSync(resolve(".passflow-data"), { recursive: true });
 
-  let cloneUrl = REPO;
-  if (TOKEN && cloneUrl.startsWith("https://")) {
-    cloneUrl = cloneUrl.replace("https://", `https://x-access-token:${TOKEN}@`);
+  // 토큰을 clone URL에 심으면 .git/config의 remote.origin.url과 clone 실패 시
+  // 에러 출력에 그대로 남는다 — 대신 이 clone에만 적용되는 extraheader로 넘겨서
+  // 자격 증명이 어디에도 저장되지 않게 한다. execFileSync는 REPO 값에 셸
+  // 메타문자가 섞여 있어도 인자로만 취급해 셸 인젝션을 막는다.
+  const args = ["clone", "--depth", "1"];
+  if (TOKEN && REPO.startsWith("https://")) {
+    const basicAuth = Buffer.from(`x-access-token:${TOKEN}`).toString("base64");
+    args.push("-c", `http.extraheader=AUTHORIZATION: basic ${basicAuth}`);
   }
+  args.push(REPO, CLONE_DIR);
 
   console.log("Cloning private question data repository...");
-  execSync(`git clone --depth 1 ${cloneUrl} ${CLONE_DIR}`, {
+  execFileSync("git", args, {
     stdio: "inherit",
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
   });
@@ -136,9 +142,13 @@ function normalizeFromClone() {
 }
 
 if (TOKEN) {
-  cloneRepo();
-  normalizeFromClone();
-  rmSync(CLONE_DIR, { recursive: true, force: true });
+  try {
+    cloneRepo();
+    normalizeFromClone();
+  } finally {
+    // clone 또는 정규화가 실패해도 토큰 헤더가 박힌 .git/config가 남지 않게 한다.
+    rmSync(CLONE_DIR, { recursive: true, force: true });
+  }
 } else if (existsSync(DEST)) {
   console.log(`PASSFLOW_DATA_TOKEN not set; using existing data at ${DEST}.`);
 } else {

@@ -48,7 +48,7 @@ http://localhost:3000 — 첫 접속 시 접근 키 입력.
 
 ## 구조
 
-```
+```text
 src/app/          라우트 + API Route Handlers
 src/features/     기능 단위 폴더 (layout, nav, practice, review)
 src/lib/          비즈니스 로직 — 순수 함수
