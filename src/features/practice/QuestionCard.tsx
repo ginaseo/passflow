@@ -43,6 +43,22 @@ function imageSrc(image: string): string {
   return `/api/media/${image}`;
 }
 
+// 표 하나(<table>...</table>)의 최대 열 개수 — 여러 표가 있으면(#64처럼 작은 표
+// 2개를 나란히 두는 경우 등) 가장 넓은 표 기준으로 판단한다. 표가 있다고 무조건
+// 카드를 넓히면 열 2~3개짜리 작은 표도 5xl까지 늘어나 텅 비어 보인다(#64).
+const WIDE_TABLE_MIN_COLUMNS = 5;
+
+function maxTableColumns(html: string): number {
+  let max = 0;
+  for (const table of html.matchAll(/<table\b[^>]*>([\s\S]*?)<\/table>/g)) {
+    for (const row of table[1].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g)) {
+      const cells = [...row[1].matchAll(/<t[hd]\b/g)].length;
+      if (cells > max) max = cells;
+    }
+  }
+  return max;
+}
+
 const TABLE_HTML_CLASS =
     // 박스 안 표/이미지는 가운데 정렬한다 — 표(box-frame 바로 아래 table)는 mx-auto로,
     // 표 2개를 나란히 두는 flex wrapper(div)는 justify-center로 중앙에 모은다.
@@ -111,7 +127,8 @@ export function QuestionCard({
   // 계속 overflow-x-auto로 가로스크롤된다. 문제 본문/보기 텍스트는 넓어진 카드
   // 안에서도 다시 max-w-xl로 좁혀 가독성을 유지한다.
   const hasWideContent =
-      Boolean(question.table?.includes("<table")) || question.options.some((o) => o.includes("<table"));
+      maxTableColumns(question.table ?? "") >= WIDE_TABLE_MIN_COLUMNS ||
+      question.options.some((o) => maxTableColumns(o) >= WIDE_TABLE_MIN_COLUMNS);
   const cardWidthClass = hasWideContent ? "max-w-xl sm:max-w-3xl lg:max-w-5xl" : "max-w-xl";
 
   const multiSelectHint = isMultiSelect && !showFeedback && (
