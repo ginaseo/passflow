@@ -10,11 +10,21 @@ export async function POST(
   try {
     const { certId, questionId } = await context.params;
     const decodedId = decodeURIComponent(questionId);
-    const body = (await request.json()) as { answer?: number | number[] };
+
+    let json: unknown;
+    try {
+      json = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Bad request" }, { status: 400 });
+    }
+    if (typeof json !== "object" || json === null) {
+      return NextResponse.json({ error: "Bad request" }, { status: 400 });
+    }
+    const answer = (json as { answer?: unknown }).answer;
 
     const isValidAnswer =
-      Number.isInteger(body.answer) ? (body.answer as number) >= 1
-        : Array.isArray(body.answer) && body.answer.length > 0 && body.answer.every((n) => Number.isInteger(n) && n >= 1);
+      Number.isInteger(answer) ? (answer as number) >= 1
+        : Array.isArray(answer) && answer.length > 0 && answer.every((n) => Number.isInteger(n) && n >= 1);
 
     if (!isValidAnswer) {
       return NextResponse.json({ error: "Bad request" }, { status: 400 });
@@ -22,7 +32,7 @@ export async function POST(
 
     const repo = getFsQuestionRepository(certId);
     const question = repo.getQuestion(decodedId);
-    const correct = gradeAnswer(question, body.answer as number | number[]);
+    const correct = gradeAnswer(question, answer as number | number[]);
 
     return NextResponse.json({
       correct,

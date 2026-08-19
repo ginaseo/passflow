@@ -40,6 +40,8 @@ function isCorrectOption(
 
 function imageSrc(image: string): string {
   if (image.startsWith("/api/media/")) return image;
+  if (/^https?:\/\//i.test(image)) return image;
+  if (image.startsWith("/")) return image;
   return `/api/media/${image}`;
 }
 

@@ -9,7 +9,10 @@ export function CertSelector() {
 
   useEffect(() => {
     fetch("/api/certificates", { credentials: "include" })
-      .then((res) => res.json() as Promise<CertInfo[]>)
+      .then((res) => {
+        if (!res.ok) throw new Error(`certificates API 요청 실패: ${res.status}`);
+        return res.json() as Promise<CertInfo[]>;
+      })
       .then(setCerts)
       .catch((err) => console.error("certificates API 로드 실패:", err));
   }, []);

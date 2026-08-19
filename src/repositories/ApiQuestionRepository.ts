@@ -79,7 +79,10 @@ export class ApiQuestionRepository implements QuestionRepository {
   async getTheoryMap(): Promise<TheoryMap> {
     try {
       return await apiFetch(`/api/${this.certId}/theory-map`);
-    } catch {
+    } catch (err) {
+      // 401(잠금 상태)까지 여기서 삼키면 상위에서 잠금을 감지하지 못하고 이론
+      // 데이터가 그냥 없는 것처럼 보인다 — 그 외 오류만 빈 맵으로 폴백한다.
+      if (err instanceof ApiAccessError) throw err;
       return {};
     }
   }

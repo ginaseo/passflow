@@ -181,8 +181,12 @@ export class FsQuestionRepository {
       let questions: Question[];
       try {
         questions = this.loadExam(examId);
-      } catch {
-        continue; // 더 이상 존재하지 않는 examId는 조용히 건너뛴다(호출부가 diff로 감지)
+      } catch (err) {
+        // "존재하지 않는 examId"만 조용히 건너뛴다(호출부가 diff로 감지해 오답노트/
+        // 즐겨찾기에서 정리한다) — JSON 파싱 오류·권한 오류 등 다른 실패까지 여기서
+        // 삼키면, 멀쩡한 문항이 "더 이상 없는 문항"으로 오인돼 지워질 수 있다.
+        if (err instanceof Error && err.message.startsWith("Exam not found:")) continue;
+        throw err;
       }
       for (const q of questions) {
         if (qnumSet.has(q.qnum)) result.push(q);

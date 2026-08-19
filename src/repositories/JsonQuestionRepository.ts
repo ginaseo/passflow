@@ -158,8 +158,11 @@ export class JsonQuestionRepository implements QuestionRepository {
       let questions;
       try {
         questions = await this.loadExam(examId);
-      } catch {
-        continue;
+      } catch (err) {
+        // 404(존재하지 않는 회차)만 건너뛴다 — 네트워크 오류·5xx·JSON 파싱 오류까지
+        // 여기서 삼키면 멀쩡한 문항이 "없는 문항"으로 오인될 수 있다.
+        if (err instanceof Error && err.message.endsWith(": 404")) continue;
+        throw err;
       }
       for (const q of questions) {
         if (qnumSet.has(q.qnum)) result.push(toPublicQuestion(q));
