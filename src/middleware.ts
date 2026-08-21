@@ -2,8 +2,17 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ACCESS_COOKIE, isAccessKeyConfigured, verifyAccessCookieValue } from "@/lib/apiAuth";
 
+// robots.txt는 권고일 뿐 강제력 없음 — AI 학습 크롤러 UA는 여기서 이중 차단.
+const BLOCKED_UA_PATTERN =
+  /GPTBot|ChatGPT-User|CCBot|anthropic-ai|ClaudeBot|Claude-Web|Google-Extended|Applebot-Extended|PerplexityBot|cohere-ai|Bytespider|meta-externalagent/i;
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const userAgent = request.headers.get("user-agent") ?? "";
+
+  if (BLOCKED_UA_PATTERN.test(userAgent)) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
 
   if (!pathname.startsWith("/api/")) {
     return NextResponse.next();
@@ -32,5 +41,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
