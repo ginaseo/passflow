@@ -119,7 +119,8 @@ export function PracticeSession({
 
   // "2개 고르시오" 같은 문항은 정답 개수(question.answerCount)만큼 고를 때까지는
   // 채점하지 않는다 — 그 전까지는 answers에 진행 중인 선택만 반영한다. 정답이 1개인
-  // 문항은 항상 requiredCount===1이라 클릭 즉시 채점되는 기존 동작 그대로다.
+  // 문항은 클릭할 때마다 선택을 덮어쓴다(재선택 가능) — 학습모드에서 채점 후에는
+  // QuestionCard가 버튼을 disabled 처리해 여기까지 호출이 안 온다.
   async function select(optionNumber: number) {
     const requiredCount = question.answerCount ?? 1;
     const current_ = answers[current];
@@ -127,7 +128,6 @@ export function PracticeSession({
 
     let nextSet: number[];
     if (requiredCount === 1) {
-      if (currentSet.length > 0) return;
       nextSet = [optionNumber];
     } else if (currentSet.includes(optionNumber)) {
       nextSet = currentSet.filter((n) => n !== optionNumber);
